@@ -280,13 +280,10 @@
     const MEMBERS = ["张三", "李四", "王五", "奥特曼"];
     const PROJECTS = [
       { id: 1, name: "校园文化节活动方案", color: "#2d8a4e", customer: { name: "", contact: "", phone: "", email: "", notes: "" } },
-      { id: 2, name: "医院陪同看护小程序开发计划", color: "#7c3aed", customer: { name: "", contact: "", phone: "", email: "", notes: "" } },
-      { id: 3, name: "银发经济与适老化服务App开发计划", color: "#06b6d4", customer: { name: "", contact: "", phone: "", email: "", notes: "" } },
-      { id: 4, name: "新能源小程序项目甘特图", color: "#3b82f6", customer: { name: "", contact: "", phone: "", email: "", notes: "" } },
-      { id: 5, name: "展会活动推广计划", color: "#f97316", customer: { name: "", contact: "", phone: "", email: "", notes: "" } },
-      { id: 6, name: "44校园文化节活动方案4", color: "#ef4444", customer: { name: "", contact: "", phone: "", email: "", notes: "" } },
-      { id: 7, name: "视频制作流程", color: "#ec4899", customer: { name: "", contact: "", phone: "", email: "", notes: "" } },
-      { id: 8, name: "新品洗衣机市场活动推广计划", color: "#10b981", customer: { name: "", contact: "", phone: "", email: "", notes: "" } },
+      { id: 8, name: "Saela Project", color: "#eab308", customer: { name: "Saela press-on-nails", contact: "", phone: "", email: "", notes: "" } },
+      { id: 9, name: "MS KU-2401（苏州群光-微软终端）", color: "#06b6d4", customer: { name: "ZH3174", contact: "", phone: "", email: "", notes: "" } },
+      { id: 10, name: "1", color: "#4f46e5", customer: { name: "", contact: "", phone: "", email: "", notes: "" } },
+      { id: 11, name: "2", color: "#4f46e5", customer: { name: "", contact: "", phone: "", email: "", notes: "" } },
     ];
     const PHASES = [
       { id: 1, projectId: 1, name: "活动筹备阶段", color: "#2d8a4e", order: 1 },
@@ -294,6 +291,9 @@
       { id: 3, projectId: 1, name: "活动执行阶段", color: "#84cc16", order: 3 },
       { id: 4, projectId: 1, name: "活动收尾阶段", color: "#eab308", order: 4 },
       { id: 5, projectId: 1, name: "活动策划阶段", color: "#ec4899", order: 5 },
+      { id: 6, projectId: 8, name: "接洽客户", color: "#2d8a4e", order: 1 },
+      { id: 7, projectId: 8, name: "下单前给出估价方案", color: "#10b981", order: 2 },
+      { id: 8, projectId: 9, name: "接洽客户", color: "#06b6d4", order: 1 },
     ];
     const TASKS = [
       { id: 1, phaseId: 1, projectId: 1, name: "确定活动主题和策划方案", start: "2025-09-06", end: "2025-09-08", done: true, members: ["张三"], hours: 8, cost: 120, notes: "已完成方案评审", anomaly: "" },
@@ -308,20 +308,29 @@
       { id: 10, phaseId: 2, projectId: 1, name: "活动场地布置规划", start: "2025-09-17", end: "2025-09-19", done: true, members: ["张三","李四"], hours: 8, cost: 120, notes: "", anomaly: "" },
       { id: 11, phaseId: 2, projectId: 1, name: "物资采购与准备", start: "2025-09-17", end: "2025-09-20", done: true, members: ["王五"], hours: 10, cost: 200, notes: "部分物资已到货", anomaly: "" },
       { id: 12, phaseId: 2, projectId: 1, name: "嘉宾邀请与节目安排", start: "2025-09-17", end: "2025-09-21", done: true, members: ["奥特曼","张三"], hours: 12, cost: 180, notes: "", anomaly: "" },
-      { id: 13, phaseId: 3, projectId: 1, name: "开幕仪式", start: "2025-09-22", end: "2025-09-22", done: false, members: ["张三","李四","王五","奥特曼"], hours: 8, cost: 200, notes: "彩排中", anomaly: "" },
-      { id: 14, phaseId: 3, projectId: 1, name: "文化展示与互动活动", start: "2025-09-23", end: "2025-09-25", done: false, members: ["李四","王五"], hours: 16, cost: 300, notes: "", anomaly: "" },
-      { id: 15, phaseId: 3, projectId: 1, name: "文艺演出与比赛", start: "2025-09-23", end: "2025-09-26", done: false, members: ["张三","奥特曼"], hours: 20, cost: 350, notes: "", anomaly: "" },
-      { id: 16, phaseId: 4, projectId: 1, name: "活动总结与反馈收集", start: "2025-09-27", end: "2025-09-29", done: false, members: ["张三","李四"], hours: 8, cost: 100, notes: "", anomaly: "" },
-      { id: 17, phaseId: 4, projectId: 1, name: "财务结算与资料归档", start: "2025-09-30", end: "2025-10-01", done: false, members: ["王五"], hours: 6, cost: 80, notes: "", anomaly: "" },
-      { id: 18, phaseId: 5, projectId: 1, name: "确定活动主题和目标", start: "2025-10-02", end: "2025-10-06", done: false, members: ["张三"], hours: 10, cost: 150, notes: "", anomaly: "" },
-      { id: 19, phaseId: 5, projectId: 1, name: "制定活动整体时间安排", start: "2025-10-07", end: "2025-10-12", done: false, members: ["李四"], hours: 12, cost: 180, notes: "", anomaly: "" },
-      { id: 20, phaseId: 5, projectId: 1, name: "规划活动内容和形式", start: "2025-10-02", end: "2025-10-05", done: false, members: ["王五"], hours: 8, cost: 120, notes: "", anomaly: "" },
-      { id: 21, phaseId: 5, projectId: 1, name: "编制活动预算", start: "2025-10-02", end: "2025-10-08", done: false, members: ["奥特曼"], hours: 6, cost: 90, notes: "", anomaly: "" },
-      { id: 22, phaseId: null, projectId: 2, name: "搭建ReactJs开发环境", start: "2025-09-23", end: "2025-09-25", done: false, members: ["张三","李四","王五"], hours: 18, cost: 592.3, notes: "", anomaly: "" },
-      { id: 23, phaseId: null, projectId: 7, name: "设备准备", start: "2025-09-26", end: "2025-09-26", done: false, members: ["张三"], hours: 4, cost: 289.5, notes: "", anomaly: "" },
-      { id: 24, phaseId: null, projectId: 1, name: "成立组织委员会", start: "2025-09-23", end: "2025-09-24", done: false, members: ["奥特曼"], hours: 7, cost: 527.6, notes: "", anomaly: "" },
+      { id: 13, phaseId: 3, projectId: 1, name: "开幕仪式", start: "2025-09-22", end: "2025-09-22", done: true, members: ["张三","李四","王五","奥特曼"], hours: 8, cost: 200, notes: "彩排中", anomaly: "" },
+      { id: 14, phaseId: 3, projectId: 1, name: "文化展示与互动活动", start: "2025-09-23", end: "2025-09-25", done: true, members: ["李四","王五"], hours: 16, cost: 300, notes: "", anomaly: "" },
+      { id: 15, phaseId: 3, projectId: 1, name: "文艺演出与比赛", start: "2025-09-23", end: "2025-09-26", done: true, members: ["张三","奥特曼"], hours: 20, cost: 350, notes: "", anomaly: "" },
+      { id: 16, phaseId: 4, projectId: 1, name: "活动总结与反馈收集", start: "2025-09-27", end: "2025-09-29", done: true, members: ["张三","李四"], hours: 8, cost: 100, notes: "", anomaly: "" },
+      { id: 17, phaseId: 4, projectId: 1, name: "财务结算与资料归档", start: "2025-09-30", end: "2025-10-01", done: true, members: ["王五"], hours: 6, cost: 80, notes: "", anomaly: "" },
+      { id: 18, phaseId: 5, projectId: 1, name: "确定活动主题和目标", start: "2025-10-02", end: "2025-10-06", done: true, members: ["张三"], hours: 10, cost: 150, notes: "", anomaly: "" },
+      { id: 19, phaseId: 5, projectId: 1, name: "制定活动整体时间安排", start: "2025-10-07", end: "2025-10-12", done: true, members: ["李四"], hours: 12, cost: 180, notes: "", anomaly: "" },
+      { id: 20, phaseId: 5, projectId: 1, name: "规划活动内容和形式", start: "2025-10-02", end: "2025-10-05", done: true, members: ["王五"], hours: 8, cost: 120, notes: "", anomaly: "" },
+      { id: 21, phaseId: 5, projectId: 1, name: "编制活动预算", start: "2025-10-02", end: "2025-10-08", done: true, members: ["奥特曼"], hours: 6, cost: 90, notes: "", anomaly: "" },
+      { id: 24, phaseId: null, projectId: 1, name: "成立组织委员会", start: "2025-09-23", end: "2025-09-24", done: true, members: ["奥特曼"], hours: 7, cost: 527.6, notes: "", anomaly: "" },
+      { id: 25, phaseId: 6, projectId: 8, name: "客户到访公司", start: "2026-06-09", end: "2026-06-09", done: true, members: ["海云"], hours: 0, cost: 0, notes: "", anomaly: "" },
+      { id: 26, phaseId: 6, projectId: 8, name: "等Saela合作意愿&收到Saela Design PPT", start: "2026-06-10", end: "2026-06-23", done: true, members: ["Victor"], hours: 0, cost: 0, notes: "依据PPT给出初步估价方案（没有图纸，只有渲染图&实物视频）", anomaly: "" },
+      { id: 27, phaseId: 7, projectId: 8, name: "初步评估Design PPT", start: "2026-06-26", end: "2026-06-26", done: true, members: ["石丹总","Iris"], hours: 0, cost: 0, notes: "弘基总决定放在7部\n7部石丹总评估给不出估价-缺少图纸/实物", anomaly: "后续中也没有及时收到3D文件&Cost target，so没走系统流程？目前估价流程不符合常规，但是因客户而异" },
+      { id: 28, phaseId: 7, projectId: 8, name: "联系贝宇塑料公司咨询CarryCase估价", start: "2026-06-29", end: "2026-07-09", done: true, members: ["Victor","Iris"], hours: 0, cost: 0, notes: "缺少外协件（磁铁/硅胶条/链）报价", anomaly: "" },
+      { id: 29, phaseId: 7, projectId: 8, name: "Microsoft meeting讨论PPT细节-敲定主要报价款式", start: "2026-07-06", end: "2026-07-06", done: true, members: ["Victor"], hours: 0, cost: 0, notes: "Saele给CarryCase的CAD&更新PPT的磁铁内容\nRoll up carrycase新增两种材质的报价", anomaly: "" },
+      { id: 30, phaseId: 7, projectId: 8, name: "收到Carry Case的CAD文件", start: "2026-07-08", end: "2026-07-08", done: true, members: ["Iris"], hours: 0, cost: 0, notes: "同步给贝宇估价", anomaly: "" },
+      { id: 31, phaseId: 7, projectId: 8, name: "邮件Saela给cost target", start: "2026-07-08", end: "2026-07-08", done: true, members: ["Iris"], hours: 0, cost: 0, notes: "无回复", anomaly: "" },
+      { id: 32, phaseId: 7, projectId: 8, name: "整理出估价方案Ver.1", start: "2026-06-26", end: "2026-07-10", done: true, members: ["Victor","Iris"], hours: 0, cost: 0, notes: "纸盒估价找了卢经理（口头，没有系统）\n外协件估价参考gpt的价格", anomaly: "" },
+      { id: 33, phaseId: 7, projectId: 8, name: "贝宇继续咨询外协件的报价", start: "2026-07-10", end: "2026-07-16", done: false, members: ["Iris"], hours: 0, cost: 0, notes: "7/15-Iris给了外购配件信息收集表to贝宇同步进度", anomaly: "" },
+      { id: 34, phaseId: 8, projectId: 9, name: "报价", start: "2026-06-16", end: "2026-06-22", done: true, members: ["Nadia"], hours: 0, cost: 0, notes: "客户代码：ZH3174 MS\n交货地址：苏州群光\n需要走正式报关进群光仓库， 美金不含税\n数量：1000，3000，5000，10000，15000\n1.牛皮紙是悅聲正霸400g  指定材質的\n2.精裝盒指定森洋的紙托  \n3.面紙是恩索的白卡紙，同KU-2003機種一樣的材質\n4.M1351976-001报6C&7C的价格\n\n后续：\n1.比较泰国&石排的报价给 Victor 见客\n2.客户要求不带笔的料新增6c&7c印刷的报价\n3.客户给了项目KU2003/2401预测，更新报价", anomaly: "料号出错，图纸文件重复，已找客户重新发送" },
+      { id: 35, phaseId: 8, projectId: 9, name: "准备审厂前工作（自评表/不侵权/物料采购契约...)", start: "2026-06-26", end: "2026-07-07", done: true, members: [], hours: 0, cost: 0, notes: "货款直拨书的付款条件&税率报关已和客户确认（石排实业title/美元收款/月结120天/USD报关）", anomaly: "物料采购契约书的条例有风险：2.4.1/2.4.2/13.1\n\n润信签过-确认条例一致\nNadia和客户沟通不接受补充协议\n弘基总确认可签，温跃军总已签" },
+      { id: 36, phaseId: 8, projectId: 9, name: "等客户确认报价方案&审厂计划", start: "2026-07-07", end: "2026-07-16", done: false, members: [], hours: 0, cost: 0, notes: "", anomaly: "" },
     ];
-    // Project review results: [{projectId, content}]
     const PROJECT_REVIEWS = [];
     const TODAY = new Date().toISOString().slice(0,10);
 
