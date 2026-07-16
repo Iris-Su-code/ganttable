@@ -1,0 +1,2780 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Ganttable - 项目管理</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f8fafb; color: #1f2937; }
+    .app { height: 100vh; display: flex; flex-direction: column; }
+    .topbar { background: #fff; border-bottom: 1px solid #e5e7eb; padding: 8px 16px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+    .topbar-logo { font-weight: 700; font-size: 18px; color: #4f46e5; display: flex; align-items: center; gap: 6px; }
+    .topbar-badge { background: #fbbf24; color: #000; font-size: 11px; padding: 2px 8px; border-radius: 10px; font-weight: 600; }
+    .topbar-title { font-size: 15px; font-weight: 600; margin-left: 8px; cursor: pointer; }
+    .topbar-tabs { display: flex; gap: 4px; margin-left: 16px; }
+    .topbar-tab { padding: 6px 14px; border-radius: 6px; font-size: 13px; cursor: pointer; border: none; background: transparent; color: #6b7280; font-weight: 500; }
+    .topbar-tab:hover { background: #f3f4f6; }
+    .topbar-tab.active { background: #eef2ff; color: #4f46e5; }
+    .topbar-right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+    .topbar-btn { padding: 6px 12px; border-radius: 6px; font-size: 13px; cursor: pointer; border: 1px solid #e5e7eb; background: #fff; }
+    .toolbar-btn { padding: 6px 14px; border-radius: 6px; font-size: 13px; cursor: pointer; border: 1px solid #e5e7eb; background: #fff; }
+    .toolbar-btn.primary { background: #4f46e5; color: #fff; border-color: #4f46e5; }
+    .toolbar-btn.active { background: #eef2ff; border-color: #4f46e5; color: #4f46e5; }
+    .gantt-container { display: flex; flex: 1; overflow: hidden; }
+    .gantt-left { border-right: 1px solid #e5e7eb; background: #fff; overflow-y: auto; transition: width 0.2s, min-width 0.2s; }
+    .gantt-right { flex: 1; overflow-x: auto; overflow-y: auto; position: relative; }
+    .gantt-header-row { display: flex; border-bottom: 1px solid #e5e7eb; background: #fafbfc; position: sticky; top: 0; z-index: 10; }
+    .gantt-header-left { padding: 8px 12px; font-size: 12px; font-weight: 600; color: #6b7280; display: flex; gap: 0; border-right: 1px solid #e5e7eb; overflow: visible; }
+    .gantt-header-left span { white-space: nowrap; position: relative; }
+    .col-resize-handle { position: absolute; right: 0; top: 0; bottom: 0; width: 8px; cursor: col-resize; z-index: 5; }
+    .col-resize-handle:hover { background: #c7d2fe; }
+    .col-resize-handle::after { content: ''; position: absolute; right: 3px; top: 20%; bottom: 20%; width: 2px; background: #d1d5db; border-radius: 1px; }
+    .col-resize-handle:hover::after { background: #4f46e5; }
+    .gantt-timeline-header { display: flex; min-width: max-content; }
+    .gantt-month-label { font-size: 12px; color: #6b7280; padding: 4px 0; text-align: center; border-bottom: 1px solid #e5e7eb; }
+    .gantt-day-cell { width: 24px; min-width: 24px; text-align: center; font-size: 11px; color: #6b7280; padding: 4px 0; border-right: 1px solid #f0f0f0; }
+    .gantt-day-cell.weekend { background: #fafbfc; }
+    .gantt-day-cell.today { background: #dbeafe; color: #1d4ed8; font-weight: 700; }
+    .gantt-task-row { display: flex; border-bottom: 1px solid #f5f5f5; min-height: 36px; align-items: flex-start; padding: 4px 0; }
+    .gantt-task-row:hover { background: #f9fafb; }
+    .gantt-task-left { padding: 4px 12px; display: flex; align-items: flex-start; gap: 6px; font-size: 13px; border-right: 1px solid #e5e7eb; }
+    .gantt-task-left .num { color: #6b7280; font-size: 12px; flex-shrink: 0; }
+    .gantt-task-left .name { white-space: normal; word-break: break-word; line-height: 1.4; }
+    .gantt-task-left .date-range { font-size: 11px; color: #fff; background: #6366f1; padding: 2px 8px; border-radius: 10px; white-space: nowrap; flex-shrink: 0; }
+    .gantt-phase-header { display: flex; align-items: center; gap: 6px; padding: 6px 12px; font-weight: 700; font-size: 14px; cursor: pointer; border-bottom: 1px solid #f0f0f0; background: #fafbfc; }
+    .gantt-phase-header .arrow { font-size: 10px; transition: transform 0.2s; }
+    .gantt-phase-header .arrow.collapsed { transform: rotate(-90deg); }
+    .gantt-phase-header .count { color: #6b7280; font-weight: 400; font-size: 13px; }
+    .gantt-bar-area { position: relative; min-width: max-content; height: 36px; }
+    .gantt-bar { position: absolute; height: 20px; top: 8px; border-radius: 4px; cursor: pointer; transition: opacity 0.2s; }
+    .gantt-bar:hover { opacity: 0.8; }
+    .gantt-bar-label { position: absolute; left: 100%; margin-left: 8px; font-size: 11px; color: #6b7280; white-space: nowrap; top: 6px; }
+    .gantt-today-line { position: absolute; top: 0; bottom: 0; width: 2px; background: #3b82f6; z-index: 5; }
+    .gantt-today-label { position: absolute; top: 0; background: #3b82f6; color: #fff; font-size: 10px; padding: 2px 6px; border-radius: 0 0 4px 4px; white-space: nowrap; }
+    .calendar-container { padding: 16px; overflow-y: auto; flex: 1; }
+    .calendar-header-bar { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
+    .calendar-date-range { font-size: 14px; font-weight: 500; display: flex; align-items: center; gap: 8px; }
+    .calendar-nav-btn { width: 28px; height: 28px; border-radius: 6px; border: 1px solid #e5e7eb; background: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 14px; }
+    .calendar-search { padding: 6px 12px; border-radius: 6px; border: 1px solid #e5e7eb; font-size: 13px; width: 200px; }
+    .calendar-view-toggle { display: flex; border-radius: 6px; overflow: hidden; border: 1px solid #e5e7eb; }
+    .calendar-view-btn { padding: 6px 14px; font-size: 13px; cursor: pointer; border: none; background: #fff; }
+    .calendar-view-btn.active { background: #4f46e5; color: #fff; }
+    .calendar-project-bar { display: flex; height: 24px; border-radius: 6px; overflow: hidden; margin-bottom: 16px; }
+    .calendar-project-segment { display: flex; align-items: center; justify-content: center; font-size: 10px; color: #fff; font-weight: 500; white-space: nowrap; overflow: hidden; }
+    .calendar-grid { border: 1px solid #e5e7eb; border-radius: 8px; background: #fff; overflow-y: hidden; overflow-x: auto; }
+    .calendar-day-headers { display: flex; border-bottom: 2px solid #e5e7eb; background: #fafbfc; min-width: max-content; }
+    .calendar-day-header { flex: 1; padding: 8px 4px; text-align: center; border-right: 1px solid #e5e7eb; font-size: 12px; min-width: 32px; }
+    .calendar-day-header:last-child { border-right: none; }
+    .calendar-day-header .day-num { font-size: 20px; font-weight: 700; }
+    .calendar-day-header .day-name { color: #6b7280; font-size: 12px; }
+    .calendar-day-header.today-col .day-num { background: #4f46e5; color: #fff; width: 32px; height: 32px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; }
+    .calendar-task-area { position: relative; min-height: 200px; display: flex; min-width: max-content; }
+    .calendar-day-col { flex: 1; border-right: 1px solid #f0f0f0; position: relative; min-width: 32px; }
+    .calendar-day-col:last-child { border-right: none; }
+    .calendar-day-col.weekend { background: #fafbfc; }
+    .calendar-day-col.today-cell { background: #eef2ff; }
+    .calendar-task-bar { position: absolute; left: 2px; right: 2px; border-radius: 6px; padding: 6px 8px; font-size: 11px; z-index: 2; overflow: hidden; cursor: pointer; transition: transform 0.15s; }
+    .calendar-task-bar:hover { transform: scale(1.02); z-index: 3; }
+    .calendar-task-bar .task-name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .calendar-task-bar .task-member { color: rgba(0,0,0,0.55); font-size: 10px; margin-top: 2px; }
+    .calendar-task-bar .task-notes { font-size: 10px; color: rgba(0,0,0,0.45); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .calendar-task-bar .task-progress { float: right; background: #10b981; color: #fff; font-size: 9px; padding: 1px 5px; border-radius: 3px; font-weight: 600; }
+    .list-container { padding: 16px; }
+    .list-table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 8px; overflow: hidden; border: 1px solid #e5e7eb; }
+    .list-table th { padding: 10px 12px; text-align: left; font-size: 12px; font-weight: 600; color: #6b7280; border-bottom: 2px solid #e5e7eb; background: #fafbfc; }
+    .list-table td { padding: 10px 12px; font-size: 13px; border-bottom: 1px solid #f5f5f5; }
+    .list-table tr:hover td { background: #f9fafb; }
+    .progress-bar-container { display: flex; align-items: center; gap: 8px; }
+    .progress-bar { flex: 1; height: 8px; background: #e5e7eb; border-radius: 4px; overflow: hidden; }
+    .progress-bar-fill { height: 100%; border-radius: 4px; background: #3b82f6; }
+    .increase-badge { background: #10b981; color: #fff; font-size: 11px; padding: 2px 6px; border-radius: 4px; font-weight: 600; }
+    .color-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+    .dashboard-container { padding: 16px; overflow-y: auto; flex: 1; }
+    .stat-cards { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 20px; }
+    .stat-card { background: #fff; border-radius: 10px; padding: 16px; border: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: flex-start; }
+    .stat-card .stat-label { font-size: 13px; color: #6b7280; margin-bottom: 8px; }
+    .stat-card .stat-value { font-size: 24px; font-weight: 700; }
+    .stat-card .stat-icon { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 18px; }
+    .dashboard-section { background: #fff; border-radius: 10px; border: 1px solid #e5e7eb; padding: 16px; margin-bottom: 16px; }
+    .dashboard-section-title { font-size: 15px; font-weight: 600; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; }
+    .dashboard-charts { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .cost-table-row { display: flex; align-items: center; padding: 8px 0; border-bottom: 1px solid #f5f5f5; font-size: 13px; }
+    .cost-table-row .project-name { flex: 1; display: flex; align-items: center; gap: 8px; }
+    .cost-table-row .progress-info { width: 200px; display: flex; align-items: center; gap: 8px; }
+    .cost-table-row .hours-info { width: 100px; text-align: right; color: #6b7280; }
+    .cost-table-row .cost-info { width: 100px; text-align: right; font-weight: 500; }
+    .dash-proj-card { background:#fff; border-radius:10px; padding:14px 16px; border:1px solid #e5e7eb; transition:box-shadow 0.15s; }
+    .dash-proj-card:hover { box-shadow:0 2px 8px rgba(0,0,0,0.06); }
+    .dash-alert-item { display:flex; align-items:center; gap:8px; padding:8px 10px; border-radius:6px; font-size:12px; cursor:pointer; transition:background 0.15s; }
+    .dash-alert-item:hover { background:#f3f4f6; }
+    .dash-member-row { display:flex; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid #f5f5f5; font-size:13px; }
+    .dash-member-row:last-child { border-bottom:none; }
+    .dash-phase-item { display:flex; align-items:center; gap:10px; padding:6px 0; font-size:12px; }
+    .workload-container { padding: 16px; overflow-y: auto; flex: 1; }
+    .workload-grid { display: flex; gap: 4px; align-items: flex-start; }
+    .workload-labels { display: flex; flex-direction: column; gap: 4px; padding-top: 20px; }
+    .workload-label { height: 20px; font-size: 12px; color: #6b7280; display: flex; align-items: center; }
+    .workload-month-row { display: flex; gap: 4px; }
+    .workload-cell { width: 20px; height: 20px; border-radius: 3px; cursor: pointer; transition: transform 0.15s; }
+    .workload-cell:hover { transform: scale(1.3); }
+    .workload-month-label { font-size: 11px; color: #6b7280; text-align: center; margin-top: 4px; }
+    .tooltip-box { position: fixed; background: #1f2937; color: #fff; padding: 8px 12px; border-radius: 6px; font-size: 12px; z-index: 1000; pointer-events: none; }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 3px; }
+    .project-dropdown { position: relative; display: inline-block; }
+    .project-dropdown-menu { position: absolute; top: 100%; left: 0; background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.12); min-width: 280px; z-index: 200; max-height: 320px; overflow-y: auto; }
+    .project-dropdown-item { padding: 10px 14px; font-size: 13px; cursor: pointer; display: flex; align-items: center; gap: 8px; }
+    .project-dropdown-item:hover { background: #f3f4f6; }
+    .project-dropdown-item.active { background: #eef2ff; color: #4f46e5; font-weight: 600; }
+    .gantt-phase-header { padding-left: 12px; }
+    .gantt-task-left { padding: 4px 12px; display: flex; align-items: flex-start; gap: 0; font-size: 13px; border-right: 1px solid #e5e7eb; }
+    .task-name-input { flex: 1; border: 1px solid #4f46e5; border-radius: 4px; padding: 2px 6px; font-size: 13px; outline: none; background: #eef2ff; min-width: 0; }
+    .date-edit-wrap { position: relative; display: inline-flex; }
+    .date-range-editable { cursor: pointer; user-select: none; }
+    .date-range-editable:hover { background: #eef2ff; border-radius: 10px; }
+    .date-popover { position: absolute; top: 100%; left: 0; margin-top: 4px; background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.12); padding: 10px 12px; z-index: 300; display: flex; gap: 8px; align-items: center; white-space: nowrap; }
+    .date-popover input[type="date"] { border: 1px solid #d1d5db; border-radius: 4px; padding: 3px 6px; font-size: 12px; outline: none; }
+    .date-popover input[type="date"]:focus { border-color: #4f46e5; }
+    .date-popover-btn { padding: 3px 10px; border-radius: 4px; font-size: 12px; cursor: pointer; border: none; }
+    .date-popover-btn.save { background: #4f46e5; color: #fff; }
+    .date-popover-btn.cancel { background: #f3f4f6; color: #374151; }
+    .gantt-toolbar { display: flex; align-items: center; gap: 8px; padding: 6px 12px; border-bottom: 1px solid #e5e7eb; background: #fafbfc; }
+    .gantt-toolbar-btn { padding: 4px 10px; border-radius: 4px; font-size: 12px; cursor: pointer; border: 1px solid #d1d5db; background: #fff; color: #374151; }
+    .gantt-toolbar-btn:hover { background: #f3f4f6; }
+    .gantt-toolbar-btn.active { background: #eef2ff; border-color: #4f46e5; color: #4f46e5; }
+    .gantt-toolbar-btn.add { background: #4f46e5; color: #fff; border-color: #4f46e5; }
+    .gantt-toolbar-btn.add:hover { background: #4338ca; }
+    .task-delete-btn { width: 18px; height: 18px; border-radius: 50%; border: none; background: #fee2e2; color: #ef4444; font-size: 12px; cursor: pointer; display: none; align-items: center; justify-content: center; flex-shrink: 0; line-height: 1; }
+    .gantt-task-row:hover .task-delete-btn { display: flex; }
+    .add-task-form { padding: 10px 12px; background: #f0f4ff; border-bottom: 1px solid #c7d2fe; display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end; }
+    .add-task-form label { font-size: 11px; color: #6b7280; display: flex; flex-direction: column; gap: 2px; }
+    .add-task-form input, .add-task-form select { border: 1px solid #d1d5db; border-radius: 4px; padding: 4px 8px; font-size: 12px; outline: none; }
+    .add-task-form input:focus, .add-task-form select:focus { border-color: #4f46e5; }
+    .add-task-form-btn { padding: 4px 12px; border-radius: 4px; font-size: 12px; cursor: pointer; border: none; }
+    .add-task-form-btn.save { background: #4f46e5; color: #fff; }
+    .add-task-form-btn.cancel { background: #e5e7eb; color: #374151; }
+    .notes-col { font-size: 11px; color: #9ca3af; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; flex-shrink: 0; }
+    .notes-col:hover { color: #6b7280; background: #f9fafb; border-radius: 3px; }
+    .notes-col.has-notes { color: #6b7280; }
+    .notes-popover { position: absolute; top: 100%; left: 160px; margin-top: 4px; background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.12); padding: 10px 12px; z-index: 300; display: flex; gap: 8px; align-items: center; white-space: nowrap; }
+    .notes-popover input { border: 1px solid #d1d5db; border-radius: 4px; padding: 3px 6px; font-size: 12px; outline: none; width: 200px; }
+    .notes-popover input:focus { border-color: #4f46e5; }
+    .fixed-popover { background:#fff; border:1px solid #e5e7eb; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.12); padding:10px 12px; display:flex; gap:8px; align-items:center; white-space:nowrap; }
+    .fixed-popover input { border:1px solid #d1d5db; border-radius:4px; padding:3px 6px; font-size:12px; outline:none; width:200px; }
+    .fixed-popover input:focus { border-color: #4f46e5; }
+    .calendar-list-table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 8px; overflow: hidden; border: 1px solid #e5e7eb; }
+    .calendar-list-table th { padding: 10px 12px; text-align: left; font-size: 12px; font-weight: 600; color: #6b7280; border-bottom: 2px solid #e5e7eb; background: #fafbfc; }
+    .calendar-list-table td { padding: 10px 12px; font-size: 13px; border-bottom: 1px solid #f5f5f5; }
+    .calendar-list-table tr:hover td { background: #f9fafb; }
+    .proj-action-btn { width:22px; height:22px; border-radius:4px; border:none; background:transparent; cursor:pointer; font-size:12px; display:flex; align-items:center; justify-content:center; opacity:0; transition:opacity 0.15s; flex-shrink:0; }
+    .project-dropdown-item:hover .proj-action-btn { opacity:1; }
+    .proj-action-btn:hover { background:#e5e7eb; }
+    .proj-action-btn.delete:hover { background:#fee2e2; color:#ef4444; }
+    .modal-overlay { position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.3); z-index:9998; display:flex; align-items:center; justify-content:center; }
+    .modal-box { background:#fff; border-radius:12px; box-shadow:0 8px 24px rgba(0,0,0,0.15); padding:20px; min-width:340px; z-index:9999; }
+    .modal-title { font-size:16px; font-weight:700; margin-bottom:16px; color:#1f2937; }
+    .modal-label { display:block; font-size:13px; font-weight:600; color:#374151; margin-bottom:4px; }
+    .modal-input { width:100%; padding:8px 12px; border:1px solid #d1d5db; border-radius:6px; font-size:14px; outline:none; }
+    .modal-input:focus { border-color:#4f46e5; }
+    .modal-actions { display:flex; gap:8px; justify-content:flex-end; margin-top:16px; }
+    .modal-btn { padding:6px 16px; border-radius:6px; font-size:13px; cursor:pointer; border:none; }
+    .modal-btn.primary { background:#4f46e5; color:#fff; }
+    .modal-btn.danger { background:#ef4444; color:#fff; }
+    .modal-btn.secondary { background:#f3f4f6; color:#374151; }
+    .phase-mgr-panel { position:absolute; top:100%; left:0; margin-top:4px; background:#fff; border:1px solid #e5e7eb; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.12); padding:12px; min-width:300px; z-index:200; }
+    .phase-mgr-item { display:flex; align-items:center; gap:8px; padding:6px 0; border-bottom:1px solid #f5f5f5; font-size:13px; }
+    .phase-mgr-item:last-child { border-bottom:none; }
+    .phase-mgr-item .phase-color { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
+    .phase-mgr-item .phase-name { flex:1; }
+    .phase-mgr-btn { padding:3px 8px; border-radius:4px; font-size:11px; cursor:pointer; border:1px solid #d1d5db; background:#fff; }
+    .phase-mgr-btn:hover { background:#f3f4f6; }
+    .phase-mgr-btn.add { background:#4f46e5; color:#fff; border-color:#4f46e5; }
+    .import-dropdown { position:absolute; top:100%; left:0; margin-top:4px; background:#fff; border:1px solid #e5e7eb; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.12); padding:8px; z-index:200; }
+    .import-dropdown-btn { display:flex; align-items:center; gap:8px; padding:8px 12px; border-radius:6px; font-size:13px; cursor:pointer; border:none; background:transparent; width:100%; text-align:left; }
+    .import-dropdown-btn:hover { background:#f3f4f6; }
+    .file-status-bar { display:flex; align-items:center; gap:6px; font-size:12px; color:#6b7280; padding:2px 8px; background:#f3f4f6; border-radius:4px; max-width:200px; }
+    .file-status-bar .file-name { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .file-status-bar .save-dot { width:6px; height:6px; border-radius:50%; flex-shrink:0; }
+    .file-status-bar .save-dot.saved { background:#10b981; }
+    .file-status-bar .save-dot.unsaved { background:#f59e0b; }
+    .file-status-bar .save-dot.no-file { background:#d1d5db; }
+    .file-tabs-bar { display:flex; align-items:center; background:#f3f4f6; border-bottom:1px solid #e5e7eb; padding:0 8px; min-height:36px; overflow-x:auto; gap:2px; }
+    .file-tab { display:flex; align-items:center; gap:6px; padding:6px 12px; font-size:12px; cursor:pointer; border-radius:6px 6px 0 0; background:#e5e7eb; color:#6b7280; white-space:nowrap; max-width:200px; border:1px solid transparent; border-bottom:none; position:relative; }
+    .file-tab:hover { background:#d1d5db; }
+    .file-tab.active { background:#fff; color:#1f2937; font-weight:500; border-color:#e5e7eb; }
+    .file-tab .tab-name { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:150px; }
+    .file-tab .tab-close { width:16px; height:16px; border-radius:50%; border:none; background:transparent; color:#9ca3af; font-size:14px; cursor:pointer; display:flex; align-items:center; justify-content:center; flex-shrink:0; line-height:1; }
+    .file-tab .tab-close:hover { background:#fee2e2; color:#ef4444; }
+    .file-tab .tab-dirty { width:6px; height:6px; border-radius:50%; background:#f59e0b; flex-shrink:0; }
+    .file-tab .tab-saved { width:6px; height:6px; border-radius:50%; background:#10b981; flex-shrink:0; }
+    .task-file-links { display:flex; gap:4px; flex-wrap:wrap; align-items:center; }
+    .file-link-badge { display:inline-flex; align-items:center; gap:4px; padding:2px 8px; background:#e0e7ff; color:#4338ca; border-radius:12px; font-size:11px; cursor:pointer; white-space:nowrap; max-width:150px; }
+    .file-link-badge:hover { background:#c7d2fe; }
+    .file-link-badge .link-icon { font-size:10px; }
+    .file-link-badge .link-name { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .file-link-add { width:18px; height:18px; border-radius:50%; border:1px dashed #9ca3af; background:transparent; color:#9ca3af; font-size:12px; cursor:pointer; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+    .file-link-add:hover { border-color:#4f46e5; color:#4f46e5; }
+    .file-links-editor { position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); background:#fff; border:1px solid #e5e7eb; border-radius:12px; box-shadow:0 8px 24px rgba(0,0,0,0.15); padding:20px; z-index:10000; min-width:400px; max-width:600px; max-height:80vh; overflow-y:auto; }
+    .file-links-editor-title { font-size:16px; font-weight:700; margin-bottom:16px; color:#1f2937; }
+    .file-link-item { display:flex; gap:8px; align-items:center; padding:8px; background:#f9fafb; border-radius:6px; margin-bottom:8px; }
+    .file-link-item input { flex:1; padding:6px 10px; border:1px solid #d1d5db; border-radius:4px; font-size:13px; outline:none; }
+    .file-link-item input:focus { border-color:#4f46e5; }
+    .file-link-item button { padding:4px 10px; border-radius:4px; font-size:12px; cursor:pointer; border:1px solid #d1d5db; background:#fff; }
+    .file-link-item button:hover { background:#f3f4f6; }
+    .file-link-item button.remove { color:#ef4444; border-color:#fecaca; }
+    .file-link-item button.remove:hover { background:#fee2e2; }
+    
+    /* Mobile responsive */
+    @media (max-width: 768px) {
+      .topbar { padding: 6px 10px; gap: 8px; }
+      .topbar-title { font-size: 13px; margin-left: 4px; }
+      .topbar-tabs { margin-left: 8px; }
+      .topbar-tab { padding: 5px 10px; font-size: 12px; }
+      .topbar-right { gap: 4px; }
+      .topbar-btn { padding: 5px 8px; font-size: 12px; }
+      .gantt-toolbar { padding: 6px 10px; gap: 6px; flex-wrap: wrap; }
+      .gantt-toolbar-btn { padding: 5px 10px; font-size: 12px; }
+      .dashboard-container { padding: 10px; }
+      .dashboard-section { padding: 12px; }
+      .dash-proj-card { padding: 10px; }
+      .file-tabs-bar { overflow-x: auto; }
+      .file-tab { padding: 6px 12px; font-size: 12px; }
+    }
+    
+    @media (max-width: 480px) {
+      .topbar-logo { font-size: 15px; }
+      .topbar-badge { font-size: 10px; padding: 1px 6px; }
+      .gantt-left { min-width: 150px !important; }
+      .gantt-task-left { padding: 4px 8px; font-size: 12px; }
+      .gantt-day-cell { width: 20px; min-width: 20px; font-size: 10px; }
+    }
+  </style>
+</head>
+<body>
+  <div id="root">Loading...</div>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "react": "https://esm.sh/react@18.3.1",
+      "react-dom/client": "https://esm.sh/react-dom@18.3.1/client",
+      "recharts": "https://esm.sh/recharts@2.12.7?deps=react@18.3.1,react-dom@18.3.1"
+    }
+  }
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
+
+  <script type="module">
+    import React, { useState, useMemo, useEffect, useRef } from 'react';
+    import { createRoot } from 'react-dom/client';
+    import {
+      LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RTooltip, ResponsiveContainer,
+      PieChart, Pie, Cell, Legend,
+    } from 'recharts';
+
+    const h = React.createElement;
+
+    // ── Data ───────────────────────────────────────────────────────────────────
+    const MEMBERS = ["张三", "李四", "王五", "奥特曼"];
+    const PROJECTS = [
+      { id: 1, name: "校园文化节活动方案", color: "#2d8a4e", customer: { name: "", contact: "", phone: "", email: "", notes: "" } },
+      { id: 2, name: "医院陪同看护小程序开发计划", color: "#7c3aed", customer: { name: "", contact: "", phone: "", email: "", notes: "" } },
+      { id: 3, name: "银发经济与适老化服务App开发计划", color: "#06b6d4", customer: { name: "", contact: "", phone: "", email: "", notes: "" } },
+      { id: 4, name: "新能源小程序项目甘特图", color: "#3b82f6", customer: { name: "", contact: "", phone: "", email: "", notes: "" } },
+      { id: 5, name: "展会活动推广计划", color: "#f97316", customer: { name: "", contact: "", phone: "", email: "", notes: "" } },
+      { id: 6, name: "44校园文化节活动方案4", color: "#ef4444", customer: { name: "", contact: "", phone: "", email: "", notes: "" } },
+      { id: 7, name: "视频制作流程", color: "#ec4899", customer: { name: "", contact: "", phone: "", email: "", notes: "" } },
+      { id: 8, name: "新品洗衣机市场活动推广计划", color: "#10b981", customer: { name: "", contact: "", phone: "", email: "", notes: "" } },
+    ];
+    const PHASES = [
+      { id: 1, projectId: 1, name: "活动筹备阶段", color: "#2d8a4e", order: 1 },
+      { id: 2, projectId: 1, name: "活动准备阶段", color: "#10b981", order: 2 },
+      { id: 3, projectId: 1, name: "活动执行阶段", color: "#84cc16", order: 3 },
+      { id: 4, projectId: 1, name: "活动收尾阶段", color: "#eab308", order: 4 },
+      { id: 5, projectId: 1, name: "活动策划阶段", color: "#ec4899", order: 5 },
+    ];
+    const TASKS = [
+      { id: 1, phaseId: 1, projectId: 1, name: "确定活动主题和策划方案", start: "2025-09-06", end: "2025-09-08", done: true, members: ["张三"], hours: 8, cost: 120, notes: "已完成方案评审", anomaly: "" },
+      { id: 2, phaseId: 1, projectId: 1, name: "成立活动组织委员会", start: "2025-09-09", end: "2025-09-10", done: true, members: ["奥特曼"], hours: 6, cost: 90, notes: "", anomaly: "" },
+      { id: 3, phaseId: 1, projectId: 1, name: "明确组织委员会的职责与分工", start: "2025-09-11", end: "2025-09-12", done: true, members: ["张三","李四"], hours: 4, cost: 60, notes: "分工明确", anomaly: "" },
+      { id: 4, phaseId: 1, projectId: 1, name: "提名并确定委员会核心成员名单", start: "2025-09-11", end: "2025-09-13", done: true, members: ["王五"], hours: 5, cost: 75, notes: "", anomaly: "" },
+      { id: 5, phaseId: 1, projectId: 1, name: "召开组织委员会成立筹备会议", start: "2025-09-14", end: "2025-09-19", done: true, members: ["张三","李四","王五"], hours: 12, cost: 180, notes: "会议纪要已归档", anomaly: "" },
+      { id: 6, phaseId: 1, projectId: 1, name: "制定组织委员会工作章程", start: "2025-09-14", end: "2025-09-16", done: true, members: ["李四"], hours: 6, cost: 90, notes: "", anomaly: "" },
+      { id: 7, phaseId: 1, projectId: 1, name: "建立内部沟通机制与定期汇报制度", start: "2025-09-17", end: "2025-09-20", done: true, members: ["王五","奥特曼"], hours: 8, cost: 120, notes: "", anomaly: "" },
+      { id: 8, phaseId: 1, projectId: 1, name: "制定详细活动预算", start: "2025-09-09", end: "2025-09-11", done: true, members: ["张三"], hours: 6, cost: 90, notes: "预算已审批", anomaly: "" },
+      { id: 9, phaseId: 1, projectId: 1, name: "活动宣传与报名", start: "2025-09-11", end: "2025-09-16", done: true, members: ["李四","王五"], hours: 10, cost: 150, notes: "", anomaly: "" },
+      { id: 10, phaseId: 2, projectId: 1, name: "活动场地布置规划", start: "2025-09-17", end: "2025-09-19", done: true, members: ["张三","李四"], hours: 8, cost: 120, notes: "", anomaly: "" },
+      { id: 11, phaseId: 2, projectId: 1, name: "物资采购与准备", start: "2025-09-17", end: "2025-09-20", done: true, members: ["王五"], hours: 10, cost: 200, notes: "部分物资已到货", anomaly: "" },
+      { id: 12, phaseId: 2, projectId: 1, name: "嘉宾邀请与节目安排", start: "2025-09-17", end: "2025-09-21", done: true, members: ["奥特曼","张三"], hours: 12, cost: 180, notes: "", anomaly: "" },
+      { id: 13, phaseId: 3, projectId: 1, name: "开幕仪式", start: "2025-09-22", end: "2025-09-22", done: false, members: ["张三","李四","王五","奥特曼"], hours: 8, cost: 200, notes: "彩排中", anomaly: "" },
+      { id: 14, phaseId: 3, projectId: 1, name: "文化展示与互动活动", start: "2025-09-23", end: "2025-09-25", done: false, members: ["李四","王五"], hours: 16, cost: 300, notes: "", anomaly: "" },
+      { id: 15, phaseId: 3, projectId: 1, name: "文艺演出与比赛", start: "2025-09-23", end: "2025-09-26", done: false, members: ["张三","奥特曼"], hours: 20, cost: 350, notes: "", anomaly: "" },
+      { id: 16, phaseId: 4, projectId: 1, name: "活动总结与反馈收集", start: "2025-09-27", end: "2025-09-29", done: false, members: ["张三","李四"], hours: 8, cost: 100, notes: "", anomaly: "" },
+      { id: 17, phaseId: 4, projectId: 1, name: "财务结算与资料归档", start: "2025-09-30", end: "2025-10-01", done: false, members: ["王五"], hours: 6, cost: 80, notes: "", anomaly: "" },
+      { id: 18, phaseId: 5, projectId: 1, name: "确定活动主题和目标", start: "2025-10-02", end: "2025-10-06", done: false, members: ["张三"], hours: 10, cost: 150, notes: "", anomaly: "" },
+      { id: 19, phaseId: 5, projectId: 1, name: "制定活动整体时间安排", start: "2025-10-07", end: "2025-10-12", done: false, members: ["李四"], hours: 12, cost: 180, notes: "", anomaly: "" },
+      { id: 20, phaseId: 5, projectId: 1, name: "规划活动内容和形式", start: "2025-10-02", end: "2025-10-05", done: false, members: ["王五"], hours: 8, cost: 120, notes: "", anomaly: "" },
+      { id: 21, phaseId: 5, projectId: 1, name: "编制活动预算", start: "2025-10-02", end: "2025-10-08", done: false, members: ["奥特曼"], hours: 6, cost: 90, notes: "", anomaly: "" },
+      { id: 22, phaseId: null, projectId: 2, name: "搭建ReactJs开发环境", start: "2025-09-23", end: "2025-09-25", done: false, members: ["张三","李四","王五"], hours: 18, cost: 592.3, notes: "", anomaly: "" },
+      { id: 23, phaseId: null, projectId: 7, name: "设备准备", start: "2025-09-26", end: "2025-09-26", done: false, members: ["张三"], hours: 4, cost: 289.5, notes: "", anomaly: "" },
+      { id: 24, phaseId: null, projectId: 1, name: "成立组织委员会", start: "2025-09-23", end: "2025-09-24", done: false, members: ["奥特曼"], hours: 7, cost: 527.6, notes: "", anomaly: "" },
+    ];
+    // Project review results: [{projectId, content}]
+    const PROJECT_REVIEWS = [];
+    const TODAY = new Date().toISOString().slice(0,10);
+
+    // ── Multi-Tab File System ─────────────────────────────────────────────────
+    const STORAGE_KEY = "ganttable_data";
+    const DB_NAME = "GanttableDB";
+    const DB_STORE = "fileHandles";
+    let dataLoaded = false; // Guard against multiple loadData calls
+    
+    // IndexedDB helpers for persisting file handles
+    const openDB = () => new Promise((resolve, reject) => {
+      const req = indexedDB.open(DB_NAME, 1);
+      req.onupgradeneeded = (e) => {
+        const db = e.target.result;
+        if (!db.objectStoreNames.contains(DB_STORE)) {
+          db.createObjectStore(DB_STORE);
+        }
+      };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+    
+    const saveHandleToDB = async (handle) => {
+      try {
+        const db = await openDB();
+        const tx = db.transaction(DB_STORE, "readwrite");
+        tx.objectStore(DB_STORE).put(handle, "currentFile");
+        return new Promise((resolve, reject) => {
+          tx.oncomplete = () => resolve();
+          tx.onerror = () => reject(tx.error);
+        });
+      } catch(e) { console.warn("Failed to save file handle:", e); }
+    };
+    
+    const loadHandleFromDB = async () => {
+      try {
+        const db = await openDB();
+        const tx = db.transaction(DB_STORE, "readonly");
+        const req = tx.objectStore(DB_STORE).get("currentFile");
+        return new Promise((resolve, reject) => {
+          req.onsuccess = () => resolve(req.result);
+          req.onerror = () => reject(req.error);
+        });
+      } catch(e) { console.warn("Failed to load file handle:", e); return null; }
+    };
+    
+    const clearHandleFromDB = async () => {
+      try {
+        const db = await openDB();
+        const tx = db.transaction(DB_STORE, "readwrite");
+        tx.objectStore(DB_STORE).delete("currentFile");
+        return new Promise((resolve, reject) => {
+          tx.oncomplete = () => resolve();
+          tx.onerror = () => reject(tx.error);
+        });
+      } catch(e) { console.warn("Failed to clear file handle:", e); }
+    };
+    
+    // Tab data structure
+    let openTabs = []; // [{id, name, handle, dirty, data:{tasks,phases,projects}}]
+    let activeTabId = null;
+    let nextTabId = 1;
+    
+    const tabListeners = [];
+    const onTabChange = (fn) => { tabListeners.push(fn); };
+    const notifyTabChange = () => { tabListeners.forEach(fn => fn()); };
+
+    const getActiveTab = () => openTabs.find(t => t.id === activeTabId);
+    
+    const getCurrentData = () => ({
+      tasks: JSON.parse(JSON.stringify(TASKS)),
+      phases: JSON.parse(JSON.stringify(PHASES)),
+      projects: JSON.parse(JSON.stringify(PROJECTS)),
+      reviews: JSON.parse(JSON.stringify(PROJECT_REVIEWS))
+    });
+
+    const loadTabData = (tab) => {
+      TASKS.length = 0;
+      PHASES.length = 0;
+      PROJECTS.length = 0;
+      PROJECT_REVIEWS.length = 0;
+      if(tab.data.tasks) TASKS.push(...tab.data.tasks);
+      if(tab.data.phases) PHASES.push(...tab.data.phases);
+      if(tab.data.projects) PROJECTS.push(...tab.data.projects);
+      if(tab.data.reviews) PROJECT_REVIEWS.push(...tab.data.reviews);
+    };
+
+    const saveTabToStorage = (tab) => {
+      // Save current in-memory data to the tab's data object
+      tab.data = getCurrentData();
+    };
+
+    const saveData = async () => {
+      const tab = getActiveTab();
+      if(!tab) return;
+      
+      // Always save to localStorage for the default tab
+      if(!tab.handle) {
+        try { localStorage.setItem(STORAGE_KEY, getFileData()); } catch(e){}
+        tab.dirty = false;
+        notifyTabChange();
+        return;
+      }
+      
+      // Save to file if this tab has a file handle
+      try {
+        let perm = await tab.handle.queryPermission({mode:"readwrite"});
+        if(perm !== "granted") {
+          perm = await tab.handle.requestPermission({mode:"readwrite"});
+        }
+        if(perm === "granted") {
+          const writable = await tab.handle.createWritable();
+          await writable.write(getFileData());
+          await writable.close();
+          tab.dirty = false;
+          notifyTabChange();
+        } else {
+          tab.dirty = true;
+          notifyTabChange();
+        }
+      } catch(e) { 
+        console.warn("File save failed:", e); 
+        tab.dirty = true; 
+        notifyTabChange();
+      }
+    };
+
+    const getFileData = () => JSON.stringify({tasks:TASKS, phases:PHASES, projects:PROJECTS}, null, 2);
+
+    const loadData = async () => {
+      if(dataLoaded) return; // Prevent multiple calls
+      dataLoaded = true;
+      
+      // Try to restore previously opened file from IndexedDB (only if permission already granted)
+      const savedHandle = await loadHandleFromDB();
+      if(savedHandle) {
+        try {
+          const perm = await savedHandle.queryPermission({mode:"read"});
+          if(perm === "granted") {
+            const file = await savedHandle.getFile();
+            const text = await file.text();
+            const d = JSON.parse(text);
+            TASKS.length = 0;
+            PHASES.length = 0;
+            PROJECTS.length = 0;
+            PROJECT_REVIEWS.length = 0;
+            if(d.tasks) TASKS.push(...d.tasks);
+            if(d.phases) PHASES.push(...d.phases);
+            if(d.projects) PROJECTS.push(...d.projects);
+            if(d.reviews) PROJECT_REVIEWS.push(...d.reviews);
+            
+            const tab = {
+              id: nextTabId++,
+              name: file.name,
+              handle: savedHandle,
+              dirty: false,
+              data: getCurrentData()
+            };
+            openTabs.push(tab);
+            activeTabId = tab.id;
+            notifyTabChange();
+            triggerGlobalRender();
+            return;
+          } else {
+            // Permission not granted, clear saved handle
+            await clearHandleFromDB();
+          }
+        } catch(e) {
+          console.warn("Failed to restore file:", e);
+          await clearHandleFromDB();
+        }
+      }
+      
+      // Fallback: Load from localStorage into a default tab
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if(raw) {
+          const d = JSON.parse(raw);
+          TASKS.length = 0;
+          PHASES.length = 0;
+          PROJECTS.length = 0;
+          if(d.tasks) TASKS.push(...d.tasks);
+          if(d.phases) PHASES.push(...d.phases);
+          if(d.projects) {
+            const seen = new Set();
+            for(const p of d.projects) {
+              if(!seen.has(p.name)) {
+                seen.add(p.name);
+                PROJECTS.push(p);
+              }
+            }
+          }
+        }
+      } catch(e){}
+      
+      const defaultTab = {
+        id: nextTabId++,
+        name: "本地数据",
+        handle: null,
+        dirty: false,
+        data: getCurrentData()
+      };
+      openTabs.push(defaultTab);
+      activeTabId = defaultTab.id;
+      notifyTabChange();
+    };
+
+    const switchTab = (tabId) => {
+      if(tabId === activeTabId) return;
+      const currentTab = getActiveTab();
+      if(currentTab) saveTabToStorage(currentTab);
+      
+      const targetTab = openTabs.find(t => t.id === tabId);
+      if(targetTab) {
+        activeTabId = tabId;
+        loadTabData(targetTab);
+        notifyTabChange();
+        triggerGlobalRender();
+      }
+    };
+
+    const closeTab = async (tabId) => {
+      const tab = openTabs.find(t => t.id === tabId);
+      if(!tab) return;
+      
+      // Check for unsaved changes
+      if(tab.dirty) {
+        const save = confirm(`"${tab.name}" 有未保存的更改，是否保存？`);
+        if(save) {
+          // Switch to this tab, save, then close
+          const prevTabId = activeTabId;
+          activeTabId = tabId;
+          loadTabData(tab);
+          await saveData();
+          activeTabId = prevTabId;
+          if(prevTabId !== tabId) {
+            const prevTab = openTabs.find(t => t.id === prevTabId);
+            if(prevTab) loadTabData(prevTab);
+          }
+        }
+      }
+      
+      // Remove tab
+      openTabs = openTabs.filter(t => t.id !== tabId);
+      
+      // Clear saved handle if closing a file tab
+      if(tab.handle) {
+        await clearHandleFromDB();
+      }
+      
+      // If closing active tab, switch to another
+      if(tabId === activeTabId && openTabs.length > 0) {
+        activeTabId = openTabs[0].id;
+        loadTabData(openTabs[0]);
+        triggerGlobalRender();
+      }
+      
+      // Ensure at least one tab exists
+      if(openTabs.length === 0) {
+        const newTab = {
+          id: nextTabId++,
+          name: "本地数据",
+          handle: null,
+          dirty: false,
+          data: {tasks:[], phases:[], projects:[]}
+        };
+        openTabs.push(newTab);
+        activeTabId = newTab.id;
+        TASKS.length = 0;
+        PHASES.length = 0;
+        PROJECTS.length = 0;
+        triggerGlobalRender();
+      }
+      
+      notifyTabChange();
+    };
+
+    const openFile = async () => {
+      if(!window.showOpenFilePicker) {
+        alert("您的浏览器不支持此功能，请使用 Chrome 或 Edge 浏览器");
+        return false;
+      }
+      
+      // Check for unsaved changes in current tab
+      const currentTab = getActiveTab();
+      if(currentTab && currentTab.dirty) {
+        const save = confirm(`"${currentTab.name}" 有未保存的更改，是否保存？`);
+        if(save) {
+          await saveData();
+        }
+      }
+      
+      try {
+        const [handle] = await window.showOpenFilePicker({
+          types: [{ description: "JSON", accept: {"application/json": [".json"]} }]
+        });
+        
+        // Check if file is already open (compare by handle identity or name)
+        const existingTab = openTabs.find(t => {
+          if(!t.handle) return false;
+          // Same handle object
+          if(t.handle === handle) return true;
+          // Same file name (fallback)
+          if(t.handle.name === handle.name) return true;
+          return false;
+        });
+        if(existingTab) {
+          switchTab(existingTab.id);
+          return true;
+        }
+        
+        const file = await handle.getFile();
+        const text = await file.text();
+        const d = JSON.parse(text);
+        
+        // Save current tab data before switching
+        if(currentTab) saveTabToStorage(currentTab);
+        
+        // Load new data
+        TASKS.length = 0;
+        PHASES.length = 0;
+        PROJECTS.length = 0;
+        if(d.tasks) TASKS.push(...d.tasks);
+        if(d.phases) PHASES.push(...d.phases);
+        if(d.projects) PROJECTS.push(...d.projects);
+        
+        // Create new tab
+        const newTab = {
+          id: nextTabId++,
+          name: file.name,
+          handle: handle,
+          dirty: false,
+          data: getCurrentData()
+        };
+        
+        openTabs.push(newTab);
+        activeTabId = newTab.id;
+        
+        // Persist file handle for restore after refresh
+        await saveHandleToDB(handle);
+        
+        await saveData();
+        notifyTabChange();
+        triggerGlobalRender();
+        return true;
+      } catch(e) {
+        if(e.name !== "AbortError") alert("打开文件失败: " + e.message);
+        return false;
+      }
+    };
+
+    const saveFileAs = async () => {
+      if(!window.showSaveFilePicker) {
+        alert("您的浏览器不支持此功能，请使用 Chrome 或 Edge 浏览器");
+        return false;
+      }
+      
+      const tab = getActiveTab();
+      if(!tab) return false;
+      
+      try {
+        const handle = await window.showSaveFilePicker({
+          types: [{ description: "JSON", accept: {"application/json": [".json"]} }],
+          suggestedName: tab.name || "ganttable_data.json"
+        });
+        
+        tab.handle = handle;
+        tab.name = handle.name;
+        await saveData();
+        notifyTabChange();
+        return true;
+      } catch(e) {
+        if(e.name !== "AbortError") alert("保存失败: " + e.message);
+        return false;
+      }
+    };
+
+    const markDirty = () => {
+      const tab = getActiveTab();
+      if(tab) {
+        tab.dirty = true;
+        saveTabToStorage(tab);
+        notifyTabChange();
+      }
+    };
+
+    // Auto-save: debounce save after data changes
+    let autoSaveTimer = null;
+    const autoSave = () => {
+      clearTimeout(autoSaveTimer);
+      autoSaveTimer = setTimeout(() => { saveData(); }, 800);
+    };
+
+    // Global render trigger - components subscribe to refresh when data is reloaded
+    const globalRenderListeners = [];
+    const onGlobalRender = (fn) => { globalRenderListeners.push(fn); };
+    const triggerGlobalRender = () => { globalRenderListeners.forEach(fn => fn()); };
+
+    loadData();
+
+    // ─── Helpers ────────────────────────────────────────────────────────────────
+    const parseDate = (s) => new Date(s + "T00:00:00");
+    const fmtDate = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    const fmtShort = (s) => s.slice(5).replace("-","/");
+    const daysBetween = (a, b) => Math.round((parseDate(b) - parseDate(a)) / 864e5);
+    const addDays = (s, n) => { const d = parseDate(s); d.setDate(d.getDate() + n); return fmtDate(d); };
+    const getPhaseTasks = (id) => TASKS.filter(t => t.phaseId === id);
+    const getProjectTasks = (pid) => TASKS.filter(t => t.projectId === pid);
+    const phaseProgress = (id) => { const ts = getPhaseTasks(id); return ts.length ? Math.round(ts.filter(t=>t.done).length/ts.length*100) : 0; };
+    const phaseDateRange = (id) => { const ts = getPhaseTasks(id); if (!ts.length) return {start:"",end:""}; const ss=[...ts.map(t=>t.start)].sort(), ee=[...ts.map(t=>t.end)].sort(); return {start:ss[0],end:ee[ee.length-1]}; };
+    const totalHours = (ts) => ts.reduce((s,t) => s+t.hours, 0);
+    const totalCost = (ts) => ts.reduce((s,t) => s+t.cost, 0);
+    const fmtHours = (h) => { const hrs=Math.floor(h), mins=Math.round((h-hrs)*60); return mins>0 ? `${hrs}时${mins}分` : `${hrs}时`; };
+    const minDate = (ts) => ts.length ? [...ts.map(t=>t.start)].sort()[0] : "2025-09-01";
+    const maxDate = (ts) => ts.length ? [...ts.map(t=>t.end)].sort().pop() : "2025-10-01";
+    const nextTaskId = () => TASKS.length > 0 ? Math.max(...TASKS.map(t=>t.id)) + 1 : 1;
+
+    // Parse text with markdown-style links [text](url) and render as React elements
+    // File handle cache: stores FileSystemFileHandle by link key (filename)
+    const fileHandleCache = new Map();
+
+    const openLinkedFile = async (linkUrl) => {
+      // Local protocol - open with OS default application via registered handler
+      if(linkUrl.startsWith('localopen://')) {
+        window.open(linkUrl, '_self');
+        return;
+      }
+      // Check if it's a web URL
+      if(linkUrl.startsWith('http://') || linkUrl.startsWith('https://')) {
+        window.open(linkUrl, '_blank');
+        return;
+      }
+      
+      // Try to find file handle in cache by matching filename
+      const fileName = linkUrl.split('/').pop().split('\\').pop();
+      let handle = fileHandleCache.get(fileName) || fileHandleCache.get(linkUrl);
+      
+      // If no exact match, try partial match
+      if(!handle) {
+        for(const [key, h] of fileHandleCache.entries()) {
+          if(key.includes(fileName) || fileName.includes(key)) {
+            handle = h;
+            break;
+          }
+        }
+      }
+      
+      if(handle) {
+        try {
+          const file = await handle.getFile();
+          const url = URL.createObjectURL(file);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = fileName;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          setTimeout(() => URL.revokeObjectURL(url), 60000);
+          return;
+        } catch(e) {
+          console.warn("Failed to open cached file:", e);
+        }
+      }
+      
+      // No cached handle - prompt user to select the file
+      try {
+        if(window.showOpenFilePicker) {
+          const [newHandle] = await window.showOpenFilePicker({
+            types: [{description: "文件", accept: {"application/octet-stream": [".*"]}}]
+          });
+          const file = await newHandle.getFile();
+          // Cache the handle for future use
+          fileHandleCache.set(fileName, newHandle);
+          fileHandleCache.set(linkUrl, newHandle);
+          const url = URL.createObjectURL(file);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = fileName;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          setTimeout(() => URL.revokeObjectURL(url), 60000);
+        } else {
+          alert("无法打开文件: " + linkUrl + "\n\n浏览器不支持文件访问，请使用 Chrome 或 Edge 浏览器。");
+        }
+      } catch(e) {
+        // User cancelled
+      }
+    };
+
+    const parseTextWithLinks = (text) => {
+      if(!text) return text;
+      const linkRegex = /\[([^\]]+)\]\(([^)]+)\)/g;
+      const parts = [];
+      let lastIndex = 0;
+      let match;
+      
+      while ((match = linkRegex.exec(text)) !== null) {
+        // Add text before the link
+        if(match.index > lastIndex) {
+          parts.push(text.slice(lastIndex, match.index));
+        }
+        // Add the link element
+        const linkText = match[1];
+        const linkUrl = match[2];
+        parts.push(
+          h("span", {
+            key: "link" + match.index,
+            style: {
+              color: "#2563eb",
+              textDecoration: "underline",
+              cursor: "pointer",
+              fontWeight: 500
+            },
+            onClick: (e) => {
+              e.stopPropagation();
+              openLinkedFile(linkUrl);
+            },
+            title: "点击打开: " + linkUrl
+          }, linkText)
+        );
+        lastIndex = match.index + match[0].length;
+      }
+      
+      // Add remaining text
+      if(lastIndex < text.length) {
+        parts.push(text.slice(lastIndex));
+      }
+      
+      return parts.length > 0 ? parts : text;
+    };
+
+    // ─── Components ─────────────────────────────────────────────────────────────
+
+    function TopBar({ view, setView, selectedProject, onSelectProject, onRenameProject, onDeleteProject, onBatchDeleteProjects }) {
+      const [dropOpen, setDropOpen] = useState(false);
+      const [showNewProject, setShowNewProject] = useState(false);
+      const [newProjName, setNewProjName] = useState("");
+      const [newProjColor, setNewProjColor] = useState("#4f46e5");
+      const [showRename, setShowRename] = useState(false);
+      const [renameProjId, setRenameProjId] = useState(null);
+      const [renameName, setRenameName] = useState("");
+      const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+      const [deleteProjId, setDeleteProjId] = useState(null);
+      const [batchMode, setBatchMode] = useState(false);
+      const [batchSelected, setBatchSelected] = useState({});
+      const [showBatchConfirm, setShowBatchConfirm] = useState(false);
+      const dropRef = useRef(null);
+      const newProjRef = useRef(null);
+      useEffect(() => {
+        if(!dropOpen) return;
+        const handler = (e) => { if(dropRef.current && !dropRef.current.contains(e.target)) setDropOpen(false); };
+        document.addEventListener("mousedown", handler);
+        return () => document.removeEventListener("mousedown", handler);
+      }, [dropOpen]);
+      useEffect(() => {
+        if(!showNewProject) return;
+        const handler = (e) => { if(newProjRef.current && !newProjRef.current.contains(e.target)) setShowNewProject(false); };
+        document.addEventListener("mousedown", handler);
+        return () => document.removeEventListener("mousedown", handler);
+      }, [showNewProject]);
+      const views = [{key:"gantt",label:"甘特图"},{key:"calendar",label:"日历"},{key:"dashboard",label:"仪表盘"},{key:"workload",label:"工作量"}];
+      const curProj = PROJECTS.find(p=>p.id===selectedProject) || PROJECTS[0];
+      const addNewProject = () => {
+        if(!newProjName.trim()) return;
+        const newId = PROJECTS.length > 0 ? Math.max(...PROJECTS.map(p=>p.id)) + 1 : 1;
+        PROJECTS.push({ id: newId, name: newProjName.trim(), color: newProjColor });
+        setNewProjName(""); setNewProjColor("#4f46e5"); setShowNewProject(false); setDropOpen(false);
+        autoSave();
+        onSelectProject(newId);
+      };
+      const doRename = () => {
+        if(!renameName.trim()) return;
+        onRenameProject(renameProjId, renameName.trim());
+        setShowRename(false); setRenameProjId(null); setRenameName("");
+      };
+      const doDelete = () => {
+        onDeleteProject(deleteProjId);
+        setShowDeleteConfirm(false); setDeleteProjId(null);
+      };
+      const doBatchDelete = () => {
+        const ids = Object.keys(batchSelected).filter(k=>batchSelected[k]).map(Number);
+        if(ids.length === 0) return;
+        onBatchDeleteProjects(ids);
+        setBatchMode(false); setBatchSelected({}); setShowBatchConfirm(false); setDropOpen(false);
+      };
+      const toggleBatchItem = (id) => {
+        setBatchSelected(prev => ({...prev, [id]: !prev[id]}));
+      };
+      const batchCount = Object.values(batchSelected).filter(v=>v).length;
+      return h("div", {className:"topbar"},
+        h("div", {className:"topbar-logo"},
+          h("svg", {viewBox:"0 0 24 24", fill:"none", stroke:"#4f46e5", strokeWidth:"2", width:24, height:24},
+            h("rect", {x:"3",y:"3",width:"18",height:"18",rx:"2"}),
+            h("path", {d:"M3 9h18M9 21V9"})
+          ), " Ganttable"
+        ),
+        h("span", {className:"topbar-badge"}, "1463 days"),
+        h("div", {className:"project-dropdown", ref:dropRef},
+          h("div", {className:"topbar-title", onClick:()=>setDropOpen(o=>!o), style:{display:"flex",alignItems:"center",gap:4}},
+            h("span", {style:{width:8,height:8,borderRadius:"50%",background:curProj.color,display:"inline-block"}}),
+            " ", curProj.name, " \u25BE"
+          ),
+          dropOpen && h("div", {className:"project-dropdown-menu"},
+            batchMode ?
+              // Batch mode: checkboxes
+              h("div", {style:{display:"flex", flexDirection:"column", gap:2}},
+                h("div", {style:{display:"flex", alignItems:"center", gap:8, padding:"4px 8px", fontSize:11, color:"#6b7280"}},
+                  h("input", {type:"checkbox", checked: PROJECTS.length > 0 && PROJECTS.every(p=>batchSelected[p.id]), onChange:e=>{const all=e.target.checked; const sel={}; PROJECTS.forEach(p=>{sel[p.id]=all;}); setBatchSelected(sel);}}),
+                  h("span", null, "全选")
+                ),
+                ...PROJECTS.map(p => h("div", {key:p.id, className:"project-dropdown-item", onClick:()=>toggleBatchItem(p.id), style:{display:"flex",alignItems:"center",gap:8,cursor:"pointer"}},
+                  h("input", {type:"checkbox", checked:!!batchSelected[p.id], onChange:()=>toggleBatchItem(p.id), onClick:e=>e.stopPropagation()}),
+                  h("span", {style:{width:8,height:8,borderRadius:"50%",background:p.color,display:"inline-block",flexShrink:0}}),
+                  h("span", {style:{flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}, p.name)
+                )),
+                h("div", {style:{borderTop:"1px solid #e5e7eb", marginTop:4, paddingTop:4, display:"flex", gap:6}},
+                  h("div", {className:"project-dropdown-item", onClick:()=>{setBatchMode(false);setBatchSelected({});}, style:{flex:1, fontSize:12, color:"#6b7280", textAlign:"center"}},
+                    "退出管理"
+                  ),
+                  h("div", {className:"project-dropdown-item", onClick:()=>{if(batchCount>0){setDropOpen(false);setShowBatchConfirm(true);}}, style:{flex:1, fontSize:12, color:batchCount>0?"#ef4444":"#d1d5db", fontWeight:600, textAlign:"center", cursor:batchCount>0?"pointer":"default"}},
+                    "删除选中" + (batchCount > 0 ? ` (${batchCount})` : "")
+                  )
+                )
+              )
+            :
+              // Normal mode
+              h("div", {style:{display:"flex", flexDirection:"column", gap:2}},
+                ...PROJECTS.map(p => h("div", {key:p.id, className:`project-dropdown-item ${p.id===selectedProject?"active":""}`, onClick:()=>{onSelectProject(p.id);setDropOpen(false);}, style:{display:"flex",alignItems:"center",gap:8}},
+                  h("span", {style:{width:8,height:8,borderRadius:"50%",background:p.color,display:"inline-block",flexShrink:0}}),
+                  h("span", {style:{flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}, " ", p.name),
+                  h("button", {className:"proj-action-btn", title:"\u91CD\u547D\u540D", onClick:(e)=>{e.stopPropagation();setDropOpen(false);setShowRename(true);setRenameProjId(p.id);setRenameName(p.name);}}, "\u270E"),
+                  PROJECTS.length > 1 && h("button", {className:"proj-action-btn delete", title:"\u5220\u9664\u9879\u76EE", onClick:(e)=>{e.stopPropagation();setDropOpen(false);setShowDeleteConfirm(true);setDeleteProjId(p.id);}}, "\u00D7")
+                )),
+                h("div", {style:{borderTop:"1px solid #e5e7eb", marginTop:4, paddingTop:4, display:"flex", gap:4}},
+                  h("div", {className:"project-dropdown-item", onClick:()=>{setShowNewProject(true);setDropOpen(false);}, style:{flex:1, color:"#4f46e5", fontWeight:600, fontSize:12}},
+                    "+ 新建项目"
+                  ),
+                  PROJECTS.length > 1 && h("div", {className:"project-dropdown-item", onClick:()=>{setBatchMode(true);setBatchSelected({});}, style:{flex:1, color:"#ef4444", fontWeight:600, fontSize:12, textAlign:"right"}},
+                    "批量删除"
+                  )
+                )
+              )
+          )
+        ),
+        showNewProject && h("div", {ref:newProjRef, style:{position:"fixed", top:"50%", left:"50%", transform:"translate(-50%,-50%)", background:"#fff", border:"1px solid #e5e7eb", borderRadius:12, boxShadow:"0 8px 24px rgba(0,0,0,0.15)", padding:20, zIndex:10000, minWidth:320}},
+          h("div", {style:{fontSize:16, fontWeight:700, marginBottom:16, color:"#1f2937"}}, "\u65B0\u5EFA\u9879\u76EE"),
+          h("div", {style:{marginBottom:12}},
+            h("label", {style:{display:"block", fontSize:13, fontWeight:600, color:"#374151", marginBottom:4}}, "\u9879\u76EE\u540D\u79F0"),
+            h("input", {value:newProjName, onChange:e=>setNewProjName(e.target.value), placeholder:"\u8F93\u5165\u9879\u76EE\u540D\u79F0", style:{width:"100%", padding:"8px 12px", border:"1px solid #d1d5db", borderRadius:6, fontSize:14, outline:"none"}, autoFocus:true, onKeyDown:e=>{if(e.key==="Enter")addNewProject();if(e.key==="Escape")setShowNewProject(false);}})
+          ),
+          h("div", {style:{marginBottom:16}},
+            h("label", {style:{display:"block", fontSize:13, fontWeight:600, color:"#374151", marginBottom:4}}, "\u9879\u76EE\u989C\u8272"),
+            h("div", {style:{display:"flex", gap:8}},
+              ...["#4f46e5","#2d8a4e","#7c3aed","#06b6d4","#3b82f6","#f97316","#ef4444","#ec4899","#10b981","#eab308"].map(c =>
+                h("div", {key:c, onClick:()=>setNewProjColor(c), style:{width:28, height:28, borderRadius:"50%", background:c, cursor:"pointer", border:newProjColor===c?"3px solid #1f2937":"2px solid #e5e7eb", boxSizing:"border-box"}})
+              )
+            )
+          ),
+          h("div", {style:{display:"flex", gap:8, justifyContent:"flex-end"}},
+            h("button", {className:"date-popover-btn cancel", onClick:()=>setShowNewProject(false)}, "\u53D6\u6D88"),
+            h("button", {className:"date-popover-btn save", onClick:addNewProject}, "\u786E\u8BA4\u6DFB\u52A0")
+          )
+        ),
+        showRename && h("div", {className:"modal-overlay", onClick:()=>setShowRename(false)},
+          h("div", {className:"modal-box", onClick:e=>e.stopPropagation()},
+            h("div", {className:"modal-title"}, "\u91CD\u547D\u540D\u9879\u76EE"),
+            h("div", {style:{marginBottom:12}},
+              h("label", {className:"modal-label"}, "\u9879\u76EE\u540D\u79F0"),
+              h("input", {className:"modal-input", value:renameName, onChange:e=>setRenameName(e.target.value), autoFocus:true,
+                onKeyDown:e=>{if(e.key==="Enter")doRename();if(e.key==="Escape")setShowRename(false);}})
+            ),
+            h("div", {className:"modal-actions"},
+              h("button", {className:"modal-btn secondary", onClick:()=>setShowRename(false)}, "\u53D6\u6D88"),
+              h("button", {className:"modal-btn primary", onClick:doRename}, "\u786E\u8BA4")
+            )
+          )
+        ),
+        showDeleteConfirm && h("div", {className:"modal-overlay", onClick:()=>setShowDeleteConfirm(false)},
+          h("div", {className:"modal-box", onClick:e=>e.stopPropagation()},
+            h("div", {className:"modal-title"}, "\u5220\u9664\u9879\u76EE"),
+            h("div", {style:{marginBottom:16, fontSize:14, color:"#374151"}},
+              "\u786E\u5B9A\u5220\u9664\u9879\u76EE\u201C", PROJECTS.find(p=>p.id===deleteProjId)?.name, "\u201D\uFF1F\u8BE5\u9879\u76EE\u4E0B\u7684\u6240\u6709\u4EFB\u52A1\u548C\u9636\u6BB5\u5C06\u88AB\u5220\u9664\u3002"
+            ),
+            h("div", {className:"modal-actions"},
+              h("button", {className:"modal-btn secondary", onClick:()=>setShowDeleteConfirm(false)}, "\u53D6\u6D88"),
+              h("button", {className:"modal-btn danger", onClick:doDelete}, "\u5220\u9664")
+            )
+          )
+        ),
+        showBatchConfirm && h("div", {className:"modal-overlay", onClick:()=>setShowBatchConfirm(false)},
+          h("div", {className:"modal-box", onClick:e=>e.stopPropagation()},
+            h("div", {className:"modal-title"}, "批量删除项目"),
+            h("div", {style:{marginBottom:16, fontSize:14, color:"#374151"}},
+              "确定删除以下 ", batchCount, " 个项目？所有相关任务和阶段将被删除。"
+            ),
+            h("div", {style:{marginBottom:16, maxHeight:200, overflowY:"auto", border:"1px solid #e5e7eb", borderRadius:6, padding:8}},
+              ...PROJECTS.filter(p=>batchSelected[p.id]).map(p =>
+                h("div", {key:p.id, style:{display:"flex", alignItems:"center", gap:8, padding:"4px 0", fontSize:13, color:"#374151"}},
+                  h("span", {style:{width:8,height:8,borderRadius:"50%",background:p.color,display:"inline-block",flexShrink:0}}),
+                  p.name
+                )
+              )
+            ),
+            h("div", {className:"modal-actions"},
+              h("button", {className:"modal-btn secondary", onClick:()=>setShowBatchConfirm(false)}, "取消"),
+              h("button", {className:"modal-btn danger", onClick:doBatchDelete}, "全部删除")
+            )
+          )
+        ),
+        h("div", {className:"topbar-tabs"},
+          ...views.map(v => h("button", {key:v.key, className:`topbar-tab ${view===v.key?"active":""}`, onClick:()=>setView(v.key)}, v.label))
+        ),
+        h("div", {className:"topbar-right"},
+          h("button", {className:"topbar-btn", onClick:()=>openFile()}, "📂 打开"),
+          h("button", {className:"topbar-btn", onClick:()=>saveFileAs()}, "💾 另存为")
+        )
+      );
+    }
+
+    function GanttView({ selectedProject }) {
+      const [collapsed, setCollapsed] = useState({});
+      const [editingId, setEditingId] = useState(null);
+      const [editField, setEditField] = useState(null);
+      const [editName, setEditName] = useState("");
+      const [editStart, setEditStart] = useState("");
+      const [editEnd, setEditEnd] = useState("");
+      const [editNotes, setEditNotes] = useState("");
+      const [showNotes, setShowNotes] = useState(true);
+      const [showMembers, setShowMembers] = useState(true);
+      const [showAnomaly, setShowAnomaly] = useState(true);
+      const [showDone, setShowDone] = useState(true);
+      const [editAnomaly, setEditAnomaly] = useState("");
+      const [editMembers, setEditMembers] = useState("");
+      // Column widths (pixels)
+      const [colWidths, setColWidths] = useState({num:28, name:200, members:100, anomaly:100, notes:150, done:80, date:130});
+      const [resizingCol, setResizingCol] = useState(null);
+      const resizeStartX = useRef(0);
+      const resizeStartW = useRef(0);
+      const [showAddForm, setShowAddForm] = useState(false);
+      const [addFormData, setAddFormData] = useState(null);
+      const [showExport, setShowExport] = useState(false);
+      const [exportProjects, setExportProjects] = useState({});
+      const [exportFormat, setExportFormat] = useState("json");
+      const [exportFilename, setExportFilename] = useState("");
+      const [popPos, setPopPos] = useState(null);
+      const [showPhaseMgr, setShowPhaseMgr] = useState(false);
+      const [renamePhaseId, setRenamePhaseId] = useState(null);
+      const [renamePhaseName, setRenamePhaseName] = useState("");
+      const [newPhaseName, setNewPhaseName] = useState("");
+      const [newPhaseColor, setNewPhaseColor] = useState("#4f46e5");
+      const [showImportDrop, setShowImportDrop] = useState(false);
+      const exportRef = useRef(null);
+      const datePopRef = useRef(null);
+      const notesPopRef = useRef(null);
+      const anomalyPopRef = useRef(null);
+      const membersPopRef = useRef(null);
+      const addFormRef = useRef(null);
+      const phaseMgrRef = useRef(null);
+      const importDropRef = useRef(null);
+      const dayWidth = 24;
+      const [renderKey, setRenderKey] = useState(0);
+      const triggerRender = () => setRenderKey(k => k + 1);
+      useEffect(() => { onGlobalRender(triggerRender); }, []);
+
+      useEffect(() => {
+        if(editingId===null) return;
+        const handler = (e) => {
+          if(editField==="date" && datePopRef.current && !datePopRef.current.contains(e.target)) { setEditingId(null); setEditField(null); }
+          if(editField==="notes" && notesPopRef.current && !notesPopRef.current.contains(e.target)) { setEditingId(null); setEditField(null); }
+          if(editField==="anomaly" && anomalyPopRef.current && !anomalyPopRef.current.contains(e.target)) { setEditingId(null); setEditField(null); }
+          if(editField==="members" && membersPopRef.current && !membersPopRef.current.contains(e.target)) { setEditingId(null); setEditField(null); }
+        };
+        document.addEventListener("mousedown", handler);
+        return () => document.removeEventListener("mousedown", handler);
+      }, [editingId, editField]);
+
+      useEffect(() => {
+        if(!showAddForm) return;
+        const handler = (e) => { if(addFormRef.current && !addFormRef.current.contains(e.target)) setShowAddForm(false); };
+        document.addEventListener("mousedown", handler);
+        return () => document.removeEventListener("mousedown", handler);
+      }, [showAddForm]);
+
+      useEffect(() => {
+        if(!showExport) return;
+        const handler = (e) => { if(exportRef.current && !exportRef.current.contains(e.target)) setShowExport(false); };
+        document.addEventListener("mousedown", handler);
+        return () => document.removeEventListener("mousedown", handler);
+      }, [showExport]);
+
+      useEffect(() => {
+        if(!showPhaseMgr) return;
+        const handler = (e) => { if(phaseMgrRef.current && !phaseMgrRef.current.contains(e.target)) setShowPhaseMgr(false); };
+        document.addEventListener("mousedown", handler);
+        return () => document.removeEventListener("mousedown", handler);
+      }, [showPhaseMgr]);
+
+      useEffect(() => {
+        if(!showImportDrop) return;
+        const handler = (e) => { if(importDropRef.current && !importDropRef.current.contains(e.target)) setShowImportDrop(false); };
+        document.addEventListener("mousedown", handler);
+        return () => document.removeEventListener("mousedown", handler);
+      }, [showImportDrop]);
+
+      // Column resize handlers
+      useEffect(() => {
+        if(!resizingCol) return;
+        const onMove = (e) => {
+          const col = resizingCol;
+          const delta = e.clientX - resizeStartX.current;
+          const newW = Math.max(40, resizeStartW.current + delta);
+          setColWidths(prev => ({...prev, [col]: newW}));
+        };
+        const onUp = () => { setResizingCol(null); document.body.style.cursor = ""; document.body.style.userSelect = ""; };
+        document.addEventListener("mousemove", onMove);
+        document.addEventListener("mouseup", onUp);
+        document.body.style.cursor = "col-resize";
+        document.body.style.userSelect = "none";
+        return () => { document.removeEventListener("mousemove", onMove); document.removeEventListener("mouseup", onUp); document.body.style.cursor = ""; document.body.style.userSelect = ""; };
+      }, [resizingCol]);
+
+      const startResize = (col, e) => {
+        e.preventDefault();
+        setResizingCol(col);
+        resizeStartX.current = e.clientX;
+        resizeStartW.current = colWidths[col];
+      };
+
+      // Initialize export projects selection (all selected by default)
+      const initExportProjects = () => {
+        const sel = {};
+        PROJECTS.forEach(p => { sel[p.id] = true; });
+        return sel;
+      };
+
+      const { ganttStart, ganttEnd } = useMemo(() => {
+        const projTasks = TASKS.filter(t => t.projectId === selectedProject);
+        if(projTasks.length === 0) return { ganttStart: "2025-09-01", ganttEnd: "2025-10-13" };
+        const minD = minDate(projTasks);
+        const maxD = maxDate(projTasks);
+        return { ganttStart: addDays(minD, -7), ganttEnd: addDays(maxD, 7) };
+      }, [selectedProject, renderKey]);
+
+      const totalDays = daysBetween(ganttStart, ganttEnd) + 1;
+      const dayOffset = (d) => daysBetween(ganttStart, d);
+
+      const months = useMemo(() => {
+        const r=[]; let d=parseDate(ganttStart);
+        while(d<=parseDate(ganttEnd)){
+          const k=`${d.getFullYear()}-${d.getMonth()}`;
+          if(!r.find(x=>x.k===k)){
+            const me=new Date(d.getFullYear(),d.getMonth()+1,0);
+            const e=me>parseDate(ganttEnd)?ganttEnd:fmtDate(me);
+            r.push({k, label:d.toLocaleString("en",{month:"long",year:"numeric"}), days:daysBetween(fmtDate(d),e)+1});
+          }
+          d.setDate(d.getDate()+1);
+        }
+        return r;
+      }, [ganttStart, ganttEnd]);
+
+      const days = useMemo(() => Array.from({length:totalDays},(_,i)=>{
+        const d=addDays(ganttStart,i), dt=parseDate(d);
+        return {date:d, day:dt.getDate(), we:dt.getDay()===0||dt.getDay()===6, today:d===TODAY};
+      }), [ganttStart, totalDays]);
+
+      const toggle = (id) => setCollapsed(p=>({...p,[id]:!p[id]}));
+      const todayLeft = dayOffset(TODAY)*dayWidth+dayWidth/2;
+
+      const projPhases = PHASES.filter(ph => ph.projectId === selectedProject);
+      const projTasks = TASKS.filter(t => t.projectId === selectedProject);
+
+      const rows = [];
+      let phaseNum = 0;
+      projPhases.forEach(ph => {
+        phaseNum++;
+        const tasks = projTasks.filter(t => t.phaseId === ph.id).sort((a,b) => parseDate(a.start) - parseDate(b.start));
+        const col = collapsed[ph.id];
+        const rng = tasks.length ? {start:[...tasks.map(t=>t.start)].sort()[0], end:[...tasks.map(t=>t.end)].sort().pop()} : {start:"",end:""};
+        const prog = tasks.length ? Math.round(tasks.filter(t=>t.done).length/tasks.length*100) : 0;
+        const dur = rng.start ? daysBetween(rng.start,rng.end)+1 : 0;
+        rows.push({type:"ph", ph, phaseNum, tasks, col, rng, prog, dur});
+        if(!col) {
+          tasks.forEach((t,i) => rows.push({type:"t", ph, phaseNum, t, taskNum:i+1}));
+          rows.push({type:"ps", ph, phaseNum, rng, prog, dur});
+        }
+      });
+      const standaloneTasks = projTasks.filter(t => t.phaseId === null).sort((a,b) => parseDate(a.start) - parseDate(b.start));
+      if(standaloneTasks.length > 0) {
+        rows.push({type:"ph", ph:{name:"其他任务",color:"#6b7280",order:phaseNum+1,id:"standalone"}, phaseNum:phaseNum+1, tasks:standaloneTasks, col:collapsed["standalone"], rng:{start:"",end:""}, prog:0, dur:0});
+        if(!collapsed["standalone"]) {
+          standaloneTasks.forEach((t,i) => rows.push({type:"t", ph:{order:phaseNum+1}, phaseNum:phaseNum+1, t, taskNum:i+1}));
+        }
+      }
+
+      // Helper: calculate popover position, flipping above click if near bottom of viewport
+      const calcPopoverPos = (e, estHeight, estWidth) => {
+        const estW = estWidth || 350;
+        const estH = estHeight || 150;
+        let x = e.clientX + 4;
+        let y = e.clientY + 4;
+        // Flip above if near bottom
+        if (y + estH > window.innerHeight - 10) {
+          y = Math.max(10, e.clientY - estH - 8);
+        }
+        // Shift left if near right edge
+        if (x + estW > window.innerWidth - 10) {
+          x = Math.max(10, window.innerWidth - estW - 10);
+        }
+        return { x, y };
+      };
+
+      const startNameEdit = (task, e) => { setEditingId(task.id); setEditField("name"); setEditName(task.name); setPopPos(calcPopoverPos(e, 120)); };
+      const saveName = (task) => { const t=TASKS.find(x=>x.id===task.id); if(t&&editName.trim()){t.name=editName.trim();} setEditingId(null); setEditField(null); setPopPos(null); triggerRender(); autoSave(); };
+      const startDateEdit = (task, e) => { setEditingId(task.id); setEditField("date"); setEditStart(task.start); setEditEnd(task.end); setPopPos(calcPopoverPos(e, 130)); };
+      const saveDate = (task) => {
+        const t=TASKS.find(x=>x.id===task.id);
+        if(t){ if(editStart&&editEnd&&parseDate(editStart)<=parseDate(editEnd)){t.start=editStart;t.end=editEnd;} }
+        setEditingId(null); setEditField(null); setPopPos(null); triggerRender(); autoSave();
+      };
+      const startNotesEdit = (task, e) => { setEditingId(task.id); setEditField("notes"); setEditNotes(task.notes || ""); setPopPos(calcPopoverPos(e, 160)); };
+      const saveNotes = (task) => { const t=TASKS.find(x=>x.id===task.id); if(t){t.notes=editNotes;} setEditingId(null); setEditField(null); setPopPos(null); triggerRender(); autoSave(); };
+      const startAnomalyEdit = (task, e) => { setEditingId(task.id); setEditField("anomaly"); setEditAnomaly(task.anomaly || ""); setPopPos(calcPopoverPos(e, 160)); };
+      const saveAnomaly = (task) => { const t=TASKS.find(x=>x.id===task.id); if(t){t.anomaly=editAnomaly;} setEditingId(null); setEditField(null); setPopPos(null); triggerRender(); autoSave(); };
+      const startMembersEdit = (task, e) => { setEditingId(task.id); setEditField("members"); setEditMembers((task.members||[]).join("\n")); setPopPos(calcPopoverPos(e, 140)); };
+      const saveMembers = (task) => { const t=TASKS.find(x=>x.id===task.id); if(t){t.members=editMembers.split(/\n|,/).map(s=>s.trim()).filter(s=>s);} setEditingId(null); setEditField(null); setPopPos(null); triggerRender(); autoSave(); };
+      const toggleDone = (task) => { const t=TASKS.find(x=>x.id===task.id); if(t){t.done=!t.done;} triggerRender(); autoSave(); };
+      const cancelEdit = () => { setEditingId(null); setEditField(null); setPopPos(null); };
+
+      const startAddTask = () => {
+        const phases = PHASES.filter(ph => ph.projectId === selectedProject);
+        setAddFormData({ name: "", start: ganttStart, end: ganttEnd, phaseId: phases.length > 0 ? phases[0].id : "none", notes: "" });
+        setShowAddForm(true);
+      };
+      const saveNewTask = () => {
+        if(!addFormData.name.trim()) return;
+        const newTask = { id: nextTaskId(), phaseId: addFormData.phaseId === "none" ? null : parseInt(addFormData.phaseId), projectId: selectedProject, name: addFormData.name.trim(), start: addFormData.start, end: addFormData.end, done: false, members: [], hours: 0, cost: 0, notes: addFormData.notes || "", anomaly: "" };
+        TASKS.push(newTask);
+        setShowAddForm(false); setAddFormData(null); triggerRender(); autoSave();
+      };
+      const cancelAddTask = () => { setShowAddForm(false); setAddFormData(null); };
+      const deleteTask = (taskId) => { const idx = TASKS.findIndex(t => t.id === taskId); if(idx !== -1) TASKS.splice(idx, 1); triggerRender(); autoSave(); };
+
+      const addPhase = () => {
+        if(!newPhaseName.trim()) return;
+        const newId = PHASES.length > 0 ? Math.max(...PHASES.map(p=>p.id)) + 1 : 1;
+        const maxOrder = PHASES.filter(p=>p.projectId===selectedProject).reduce((m,p)=>Math.max(m,p.order),0);
+        PHASES.push({ id:newId, projectId:selectedProject, name:newPhaseName.trim(), color:newPhaseColor, order:maxOrder+1 });
+        setNewPhaseName(""); setNewPhaseColor("#4f46e5"); triggerRender(); autoSave();
+      };
+      const doRenamePhase = () => {
+        if(!renamePhaseName.trim()) return;
+        const ph = PHASES.find(p=>p.id===renamePhaseId);
+        if(ph) { ph.name = renamePhaseName.trim(); }
+        setRenamePhaseId(null); setRenamePhaseName(""); triggerRender(); autoSave();
+      };
+      const doDeletePhase = (phaseId) => {
+        const idx = PHASES.findIndex(p=>p.id===phaseId);
+        if(idx===-1) return;
+        PHASES.splice(idx, 1);
+        // Reassign tasks to no phase
+        TASKS.forEach(t => { if(t.phaseId===phaseId) t.phaseId=null; });
+        triggerRender(); autoSave();
+      };
+
+      const leftW = colWidths.num + colWidths.name + (showMembers ? colWidths.members : 0) + (showAnomaly ? colWidths.anomaly : 0) + (showNotes ? colWidths.notes : 0) + (showDone ? colWidths.done : 0) + colWidths.date;
+      const numFlex = `0 0 ${colWidths.num}px`;
+      const nameFlex = `0 0 ${colWidths.name}px`;
+      const membersFlex = `0 0 ${colWidths.members}px`;
+      const notesFlex = `0 0 ${colWidths.notes}px`;
+      const anomalyFlex = `0 0 ${colWidths.anomaly}px`;
+      const doneFlex = `0 0 ${colWidths.done}px`;
+      const dateFlex = `0 0 ${colWidths.date}px`;
+      const headerH1 = 28; // month labels
+      const headerH2 = 28; // day numbers
+
+      // Unified container: toolbar frozen at top, scrollable area below
+      return h("div", {style:{display:"flex", flexDirection:"column", flex:1, minHeight:0, overflow:"hidden"}},
+        // Toolbar - frozen, never scrolls
+        h("div", {className:"gantt-toolbar", style:{borderBottom:"1px solid #e5e7eb", flexShrink:0}},
+          h("button", {className:`gantt-toolbar-btn ${showMembers?"active":""}`, onClick:()=>setShowMembers(!showMembers)},
+            showMembers ? "\u2713 \u8D1F\u8D23\u4EBA" : "\u8D1F\u8D23\u4EBA"),
+          h("button", {className:`gantt-toolbar-btn ${showAnomaly?"active":""}`, onClick:()=>setShowAnomaly(!showAnomaly)},
+            showAnomaly ? "\u2713 \u5F02\u5E38" : "\u5F02\u5E38"),
+          h("button", {className:`gantt-toolbar-btn ${showNotes?"active":""}`, onClick:()=>setShowNotes(!showNotes)},
+            showNotes ? "\u2713 \u5907\u6CE8" : "\u5907\u6CE8"),
+          h("button", {className:`gantt-toolbar-btn ${showDone?"active":""}`, onClick:()=>setShowDone(!showDone)},
+            showDone ? "\u2713 \u5B8C\u6210\u60C5\u51B5" : "\u5B8C\u6210\u60C5\u51B5"),
+          h("div", {style:{position:"relative"}},
+            h("button", {className:`gantt-toolbar-btn ${showExport?"active":""}`, onClick:()=>{setShowExport(!showExport); if(!showExport){setExportProjects(initExportProjects()); setExportFilename("");}}}, "\u5BFC\u51FA"),
+            showExport && h("div", {ref:exportRef, style:{position:"absolute", top:"100%", left:0, marginTop:4, background:"#fff", border:"1px solid #e5e7eb", borderRadius:8, boxShadow:"0 4px 12px rgba(0,0,0,0.12)", padding:12, minWidth:280, zIndex:200}},
+              h("div", {style:{fontSize:12, fontWeight:600, marginBottom:8, color:"#374151"}}, "\u9009\u62E9\u5BFC\u51FA\u9879\u76EE"),
+              h("label", {style:{display:"flex", alignItems:"center", gap:6, fontSize:12, marginBottom:6, cursor:"pointer"}},
+                h("input", {type:"checkbox", checked:Object.values(exportProjects).every(v=>v), onChange:e=>{const all=e.target.checked; const sel={}; PROJECTS.forEach(p=>{sel[p.id]=all;}); setExportProjects(sel);}}),
+                "\u5168\u9009"
+              ),
+              ...PROJECTS.map(p => h("label", {key:p.id, style:{display:"flex", alignItems:"center", gap:6, fontSize:12, marginBottom:4, cursor:"pointer"}},
+                h("input", {type:"checkbox", checked:!!exportProjects[p.id], onChange:e=>setExportProjects(prev=>({...prev, [p.id]:e.target.checked}))}),
+                h("span", {style:{width:8, height:8, borderRadius:"50%", background:p.color, display:"inline-block"}}),
+                " ", p.name
+              )),
+              h("div", {style:{marginTop:10, fontSize:12, fontWeight:600, color:"#374151"}}, "\u5BFC\u51FA\u683C\u5F0F"),
+              h("div", {style:{display:"flex", gap:8, marginTop:4}},
+                h("label", {style:{display:"flex", alignItems:"center", gap:4, fontSize:12, cursor:"pointer"}},
+                  h("input", {type:"radio", name:"exportFormat", checked:exportFormat==="json", onChange:()=>setExportFormat("json")}), " JSON"),
+                h("label", {style:{display:"flex", alignItems:"center", gap:4, fontSize:12, cursor:"pointer"}},
+                  h("input", {type:"radio", name:"exportFormat", checked:exportFormat==="excel", onChange:()=>setExportFormat("excel")}), " Excel")
+              ),
+              h("div", {style:{marginTop:10, fontSize:12, fontWeight:600, color:"#374151"}}, "\u6587\u4EF6\u540D"),
+              h("input", {value:exportFilename, onChange:e=>setExportFilename(e.target.value), placeholder:"\u9879\u76EE\u8BB0\u5F55\u8868test", style:{width:"100%", marginTop:4, padding:"4px 8px", border:"1px solid #d1d5db", borderRadius:4, fontSize:12, outline:"none"}}),
+              h("div", {style:{display:"flex", gap:8, marginTop:10}},
+                h("button", {className:"gantt-toolbar-btn add", style:{flex:1}, onClick:()=>{
+                  const selectedPids = Object.entries(exportProjects).filter(([_,v])=>v).map(([k])=>parseInt(k));
+                  if(selectedPids.length===0) { alert("\u8BF7\u81F3\u5C11\u9009\u62E9\u4E00\u4E2A\u9879\u76EE"); return; }
+                  const fname = exportFilename.trim() || "\u9879\u76EE\u8BB0\u5F55\u8868test";
+                  const ext = exportFormat === "json" ? ".json" : ".xlsx";
+                  if(exportFormat === "json") {
+                    const expTasks = TASKS.filter(t=>selectedPids.includes(t.projectId));
+                    const expPhases = PHASES.filter(p=>selectedPids.includes(p.projectId));
+                    const expProjects = PROJECTS.filter(p=>selectedPids.includes(p.id));
+                    const blob = new Blob([JSON.stringify({tasks:expTasks, phases:expPhases, projects:expProjects}, null, 2)], {type:"application/json"});
+                    const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = fname + ext; a.click();
+                  } else {
+                    const expTasks = TASKS.filter(t=>selectedPids.includes(t.projectId));
+                    const expProjects = PROJECTS.filter(p=>selectedPids.includes(p.id));
+                    const wb = XLSX.utils.book_new();
+                    
+                    // Calculate date range for Gantt chart
+                    const allDates = expTasks.flatMap(t => [t.start, t.end]).filter(d => d);
+                    const sortedDates = allDates.length ? [...allDates].sort() : [TODAY, TODAY];
+                    const minDateStr = sortedDates[0];
+                    const maxDateStr = sortedDates[sortedDates.length - 1];
+                    const startDate = new Date(minDateStr);
+                    const endDate = new Date(maxDateStr);
+                    const daysDiff = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24)) + 1;
+                    const numDays = Math.min(daysDiff, 365);
+                    
+                    // Build month groups for header row
+                    const monthGroups = [];
+                    let curMonth = -1;
+                    for (let i = 0; i < numDays; i++) {
+                      const d = new Date(startDate);
+                      d.setDate(d.getDate() + i);
+                      const mk = d.getFullYear() * 12 + d.getMonth();
+                      if (mk !== curMonth) {
+                        monthGroups.push({ label: d.toLocaleString("en", {month:"short", year:"numeric"}), count: 1 });
+                        curMonth = mk;
+                      } else {
+                        monthGroups[monthGroups.length - 1].count++;
+                      }
+                    }
+                    
+                    // Fixed column definitions (task table only)
+                    const fixedHeaders = ["项目", "阶段", "任务名", "开始", "截止", "完成状态", "负责人", "异常", "备注"];
+                    const numFixed = fixedHeaders.length;
+                    const totalCols = numFixed + numDays;
+                    
+                    // Layout: project info section (3 rows) + gap (1 row) + task headers (2 rows) + task rows
+                    const projInfoRows = 3; // title + header + data (merged if multiple projects)
+                    const projDataRowCount = Math.max(expProjects.length, 1);
+                    const gapRows = 1;
+                    const taskHeaderRows = 2;
+                    const taskStartRow = projInfoRows + projDataRowCount + gapRows;
+                    const totalTaskRows = taskHeaderRows + expTasks.length;
+                    const reviewRows = PROJECTS.length + 2;
+                    const totalSheetRows = taskStartRow + totalTaskRows + reviewRows;
+                    
+                    const ws = {};
+                    ws['!ref'] = XLSX.utils.encode_range({s:{r:0,c:0}, e:{r:totalSheetRows - 1, c:totalCols-1}});
+                    
+                    // Helper to set cell
+                    const setCell = (r, c, val, style) => {
+                      const ref = XLSX.utils.encode_cell({r, c});
+                      const cell = {t: typeof val === "number" ? "n" : "s", v: val};
+                      if (style) cell.s = style;
+                      ws[ref] = cell;
+                    };
+                    
+                    const headerStyle = {
+                      font: {bold: true, sz: 10},
+                      fill: {fgColor: {rgb: "F3F4F6"}},
+                      alignment: {horizontal: "center", vertical: "center"},
+                      border: {top:{style:"thin",color:{rgb:"D1D5DB"}},bottom:{style:"thin",color:{rgb:"D1D5DB"}},left:{style:"thin",color:{rgb:"D1D5DB"}},right:{style:"thin",color:{rgb:"D1D5DB"}}}
+                    };
+                    const thinBorder = {top:{style:"thin",color:{rgb:"D1D5DB"}},bottom:{style:"thin",color:{rgb:"D1D5DB"}},left:{style:"thin",color:{rgb:"D1D5DB"}},right:{style:"thin",color:{rgb:"D1D5DB"}}};
+                    
+                    // === PROJECT INFO SECTION (top) ===
+                    // Row 0: Title
+                    setCell(0, 0, "项目信息", {font: {bold: true, sz: 12}, fill: {fgColor: {rgb: "EEF2FF"}}, alignment: {vertical: "center"}});
+                    
+                    // Row 1: Column headers
+                    const custHeaders = ["项目", "客户名称", "联系人", "电话", "邮箱", "客户备注"];
+                    custHeaders.forEach((h, i) => {
+                      setCell(1, i, h, headerStyle);
+                    });
+                    
+                    // Row 2+: Project data rows
+                    const projInfoStartRow = 2;
+                    expProjects.forEach((p, pi) => {
+                      const r = projInfoStartRow + pi;
+                      const cust = p.customer || {};
+                      const custVals = [p.name, cust.name||"", cust.contact||"", cust.phone||"", cust.email||"", cust.notes||""];
+                      custVals.forEach((v, ci) => {
+                        setCell(r, ci, v, {
+                          font: {sz: 10},
+                          alignment: {vertical: "center"},
+                          border: {bottom:{style:"thin",color:{rgb:"F0F0F0"}},left:{style:"thin",color:{rgb:"F0F0F0"}},right:{style:"thin",color:{rgb:"F0F0F0"}}}
+                        });
+                      });
+                    });
+                    
+                    // === TASK TABLE SECTION ===
+                    const taskHeaderRow1 = taskStartRow;
+                    const taskHeaderRow2 = taskStartRow + 1;
+                    
+                    // Row: fixed headers + month labels
+                    fixedHeaders.forEach((h, i) => {
+                      setCell(taskHeaderRow1, i, h, headerStyle);
+                    });
+                    let mc = numFixed;
+                    monthGroups.forEach(mg => {
+                      setCell(taskHeaderRow1, mc, mg.label, {
+                        font: {bold: true, sz: 10, color: {rgb: "374151"}},
+                        fill: {fgColor: {rgb: "F3F4F6"}},
+                        alignment: {horizontal: "center", vertical: "center"},
+                        border: {top:{style:"thin",color:{rgb:"D1D5DB"}},bottom:{style:"thin",color:{rgb:"D1D5DB"}},left:{style:"thin",color:{rgb:"D1D5DB"}},right:{style:"thin",color:{rgb:"D1D5DB"}}}
+                      });
+                      mc += mg.count;
+                    });
+                    
+                    // Row: empty for fixed cols + day numbers
+                    for (let i = 0; i < numDays; i++) {
+                      const d = new Date(startDate);
+                      d.setDate(d.getDate() + i);
+                      setCell(taskHeaderRow2, numFixed + i, d.getDate(), {
+                        font: {sz: 9, color: {rgb: "6B7280"}},
+                        alignment: {horizontal: "center", vertical: "center"},
+                        border: {bottom:{style:"thin",color:{rgb:"E5E7EB"}},left:{style:"thin",color:{rgb:"F0F0F0"}},right:{style:"thin",color:{rgb:"F0F0F0"}}}
+                      });
+                    }
+                    
+                    // Task rows
+                    expTasks.forEach((t, ri) => {
+                      const row = taskStartRow + taskHeaderRows + ri;
+                      const proj = PROJECTS.find(p => p.id === t.projectId);
+                      const ph = PHASES.find(p => p.id === t.phaseId);
+                      const vals = [
+                        proj ? proj.name : "",
+                        ph ? ph.name : "",
+                        t.name,
+                        t.start,
+                        t.end,
+                        t.done ? "已完成" : "未完成",
+                        t.members ? t.members.join(", ") : "",
+                        t.anomaly || "",
+                        t.notes || ""
+                      ];
+                      vals.forEach((v, ci) => {
+                        setCell(row, ci, v, {
+                          font: {sz: 10},
+                          alignment: {vertical: "center"},
+                          border: {bottom:{style:"thin",color:{rgb:"F0F0F0"}},left:{style:"thin",color:{rgb:"F0F0F0"}},right:{style:"thin",color:{rgb:"F0F0F0"}}}
+                        });
+                      });
+                      
+                      // Gantt cells
+                      const taskStart = new Date(t.start);
+                      const taskEnd = new Date(t.end);
+                      for (let i = 0; i < numDays; i++) {
+                        const currentDate = new Date(startDate);
+                        currentDate.setDate(currentDate.getDate() + i);
+                        if (currentDate >= taskStart && currentDate <= taskEnd) {
+                          setCell(row, numFixed + i, " ", {
+                            fill: {fgColor: {rgb: "95B3D7"}},
+                            font: {color: {rgb: "95B3D7"}, sz: 8},
+                            alignment: {horizontal: "center", vertical: "center"},
+                            border: {left:{style:"thin",color:{rgb:"95B3D7"}},right:{style:"thin",color:{rgb:"95B3D7"}}}
+                          });
+                        } else {
+                          setCell(row, numFixed + i, " ", {
+                            font: {color: {rgb: "FFFFFF"}, sz: 1},
+                            border: {left:{style:"thin",color:{rgb:"F5F5F5"}},right:{style:"thin",color:{rgb:"F5F5F5"}}}
+                          });
+                        }
+                      }
+                    });
+                    
+                    // Column widths
+                    const colWidthsArr = [
+                      {wch: 18}, {wch: 14}, {wch: 28}, {wch: 12}, {wch: 12},
+                      {wch: 10}, {wch: 14}, {wch: 18}, {wch: 28}
+                    ];
+                    for (let i = 0; i < numDays; i++) {
+                      colWidthsArr.push({wch: 3});
+                    }
+                    ws['!cols'] = colWidthsArr;
+                    
+                    // Row heights
+                    const rowHeights = [];
+                    for (let i = 0; i < taskStartRow; i++) rowHeights.push({hpt: 22});
+                    rowHeights.push({hpt: 24}); // task header row 1
+                    rowHeights.push({hpt: 18}); // task header row 2
+                    ws['!rows'] = rowHeights;
+                    
+                    // Merge month header cells
+                    const merges = [];
+                    let mci = numFixed;
+                    monthGroups.forEach(mg => {
+                      if (mg.count > 1) {
+                        merges.push({s: {r: taskHeaderRow1, c: mci}, e: {r: taskHeaderRow1, c: mci + mg.count - 1}});
+                      }
+                      mci += mg.count;
+                    });
+                    // Merge project info title row
+                    merges.push({s: {r: 0, c: 0}, e: {r: 0, c: Math.min(5, totalCols - 1)}});
+                    ws['!merges'] = merges;
+                    
+                    // Add project review section at the bottom
+                    const reviewStartRow = taskStartRow + totalTaskRows + 2;
+                    setCell(reviewStartRow, 0, "项目复盘结果", {
+                      font: {bold: true, sz: 12},
+                      fill: {fgColor: {rgb: "F3F4F6"}},
+                      alignment: {vertical: "center"}
+                    });
+                    
+                    PROJECTS.forEach((p, pi) => {
+                      const review = PROJECT_REVIEWS.find(r => r.projectId === p.id);
+                      const rRow = reviewStartRow + 1 + pi;
+                      setCell(rRow, 0, p.name, {
+                        font: {bold: true, sz: 10},
+                        alignment: {vertical: "center"}
+                      });
+                      setCell(rRow, 1, review ? review.content : "", {
+                        font: {sz: 10},
+                        alignment: {vertical: "center", wrapText: true}
+                      });
+                      if (totalCols > 2) {
+                        merges.push({s: {r: rRow, c: 1}, e: {r: rRow, c: Math.min(8, totalCols - 1)}});
+                      }
+                    });
+                    
+                    XLSX.utils.book_append_sheet(wb, ws, "任务");
+                    XLSX.writeFile(wb, fname + ext);
+                  }
+                  setShowExport(false);
+                }}, "\u786E\u8BA4\u5BFC\u51FA"),
+                h("button", {className:"gantt-toolbar-btn", onClick:()=>setShowExport(false)}, "\u53D6\u6D88")
+              )
+            )
+          ),
+          h("div", {style:{position:"relative"}, ref:importDropRef},
+            h("button", {className:`gantt-toolbar-btn ${showImportDrop?"active":""}`, onClick:()=>setShowImportDrop(!showImportDrop)}, "\u5BFC\u5165"),
+            showImportDrop && h("div", {className:"import-dropdown"},
+              h("button", {className:"import-dropdown-btn", onClick:()=>{
+                setShowImportDrop(false);
+                const inp=document.createElement("input"); inp.type="file"; inp.accept=".json";
+                inp.onchange=()=>{const f=inp.files[0]; if(!f)return; const r=new FileReader(); r.onload=()=>{try{const d=JSON.parse(r.result);if(d.tasks){TASKS.length=0;TASKS.push(...d.tasks);}if(d.phases){PHASES.length=0;PHASES.push(...d.phases);}if(d.projects){PROJECTS.length=0;PROJECTS.push(...d.projects);}if(d.reviews){PROJECT_REVIEWS.length=0;PROJECT_REVIEWS.push(...d.reviews);}autoSave();triggerRender();}catch(e){alert("\u6587\u4EF6\u683C\u5F0F\u9519\u8BEF");}}; r.readAsText(f);};
+                inp.click();
+              }}, "\uD83D\uDCC4 JSON \u6587\u4EF6"),
+              h("button", {className:"import-dropdown-btn", onClick:()=>{
+                setShowImportDrop(false);
+                const inp=document.createElement("input"); inp.type="file"; inp.accept=".xlsx,.xls,.csv";
+                inp.onchange=()=>{const f=inp.files[0]; if(!f)return; const r=new FileReader(); r.onload=()=>{
+                  try{
+                    const data=new Uint8Array(r.result);
+                    const wb=XLSX.read(data,{type:"array"});
+                    let imported=0;
+                    const taskSheet=wb.Sheets["\u4EFB\u52A1"]||wb.Sheets[wb.SheetNames[0]];
+                    if(taskSheet){
+                      const rows=XLSX.utils.sheet_to_json(taskSheet);
+                      rows.forEach(row=>{
+                        const projName=row["\u9879\u76EE"]||""; const phaseName=row["\u9636\u6BB5"]||"";
+                        let proj=PROJECTS.find(p=>p.name===projName);
+                        if(!proj&&projName){const nid=Math.max(...PROJECTS.map(p=>p.id),0)+1;proj={id:nid,name:projName,color:"#6366f1"};PROJECTS.push(proj);}
+                        let phase=PHASES.find(p=>p.name===phaseName&&p.projectId===(proj?proj.id:null));
+                        if(!phase&&phaseName&&proj){const nid=Math.max(...PHASES.map(p=>p.id),0)+1;phase={id:nid,projectId:proj.id,name:phaseName,color:"#6366f1",order:PHASES.filter(p=>p.projectId===proj.id).length+1};PHASES.push(phase);}
+                        TASKS.push({id:nextTaskId(),phaseId:phase?phase.id:null,projectId:proj?proj.id:selectedProject,name:row["\u4EFB\u52A1\u540D"]||"",start:row["\u5F00\u59CB"]||TODAY,end:row["\u622A\u6B62"]||TODAY,done:(row["\u5B8C\u6210\u72B6\u6001"]||"").includes("\u5DF2\u5B8C\u6210"),members:[],hours:0,cost:0,notes:"",anomaly:""});
+                        imported++;
+                      });
+                    }
+                    autoSave();triggerRender();
+                    alert("\u5BFC\u5165\u5B8C\u6210\uFF0C\u5171 "+imported+" \u6761\u4EFB\u52A1");
+                  }catch(e){alert("\u5BFC\u5165\u5931\u8D25\uFF1A"+e.message);}
+                }; r.readAsArrayBuffer(f);};
+                inp.click();
+              }}, "\uD83D\uDCCA Excel / CSV \u6587\u4EF6")
+            )
+          ),
+          h("div", {style:{position:"relative"}, ref:phaseMgrRef},
+            h("button", {className:`gantt-toolbar-btn ${showPhaseMgr?"active":""}`, onClick:()=>setShowPhaseMgr(!showPhaseMgr)}, "\u9636\u6BB5\u7BA1\u7406"),
+            showPhaseMgr && h("div", {className:"phase-mgr-panel"},
+              h("div", {style:{fontSize:13, fontWeight:600, marginBottom:8, color:"#374151"}}, "\u9636\u6BB5\u7BA1\u7406"),
+              ...PHASES.filter(ph=>ph.projectId===selectedProject).sort((a,b)=>a.order-b.order).map(ph =>
+                h("div", {className:"phase-mgr-item", key:ph.id},
+                  h("div", {className:"phase-color", style:{background:ph.color}}),
+                  renamePhaseId===ph.id
+                    ? h(React.Fragment, null,
+                        h("input", {className:"modal-input", style:{flex:1, padding:"4px 8px", fontSize:12}, value:renamePhaseName, onChange:e=>setRenamePhaseName(e.target.value), autoFocus:true,
+                          onKeyDown:e=>{if(e.key==="Enter")doRenamePhase();if(e.key==="Escape"){setRenamePhaseId(null);setRenamePhaseName("");}}}),
+                        h("button", {className:"phase-mgr-btn", onClick:doRenamePhase, style:{fontSize:11}}, "\u2713")
+                      )
+                    : h(React.Fragment, null,
+                        h("span", {className:"phase-name"}, ph.name),
+                        h("button", {className:"phase-mgr-btn", onClick:()=>{setRenamePhaseId(ph.id);setRenamePhaseName(ph.name);}}, "\u91CD\u547D\u540D"),
+                        h("button", {className:"phase-mgr-btn", onClick:()=>doDeletePhase(ph.id), style:{color:"#ef4444"}}, "\u5220\u9664")
+                      )
+                )
+              ),
+              PHASES.filter(ph=>ph.projectId===selectedProject).length===0 && h("div", {style:{fontSize:12, color:"#9ca3af", padding:"8px 0"}}, "\u6682\u65E0\u9636\u6BB5"),
+              h("div", {style:{marginTop:8, display:"flex", gap:6, alignItems:"center"}},
+                h("input", {className:"modal-input", style:{flex:1, padding:"4px 8px", fontSize:12}, value:newPhaseName, onChange:e=>setNewPhaseName(e.target.value), placeholder:"\u65B0\u9636\u6BB5\u540D\u79F0",
+                  onKeyDown:e=>{if(e.key==="Enter")addPhase();}}),
+                h("div", {style:{display:"flex", gap:4}},
+                  ...["#4f46e5","#2d8a4e","#7c3aed","#06b6d4","#ec4899","#f97316","#ef4444","#10b981"].map(c =>
+                    h("div", {key:c, onClick:()=>setNewPhaseColor(c), style:{width:18, height:18, borderRadius:"50%", background:c, cursor:"pointer", border:newPhaseColor===c?"2px solid #1f2937":"1px solid #e5e7eb", boxSizing:"border-box"}})
+                  )
+                ),
+                h("button", {className:"phase-mgr-btn add", onClick:addPhase}, "+")
+              )
+            )
+          ),
+          h("div", {style:{flex:1}}),
+          h("button", {className:"gantt-toolbar-btn add", onClick:showAddForm ? cancelAddTask : startAddTask},
+            showAddForm ? "\u2715 \u53D6\u6D88" : "+ \u65B0\u4EFB\u52A1")
+        ),
+        // Add task form - frozen
+        showAddForm && addFormData && h("div", {className:"add-task-form", style:{flexShrink:0}},
+          h("label", null, "\u4EFB\u52A1\u540D", h("input", {value:addFormData.name, onChange:e=>setAddFormData({...addFormData, name:e.target.value}), placeholder:"\u8F93\u5165\u4EFB\u52A1\u540D\u79F0", style:{width:"160px"}, autoFocus:true})),
+          h("label", null, "\u5F00\u59CB", h("input", {type:"date", value:addFormData.start, onChange:e=>setAddFormData({...addFormData, start:e.target.value})})),
+          h("label", null, "\u622A\u6B62", h("input", {type:"date", value:addFormData.end, onChange:e=>setAddFormData({...addFormData, end:e.target.value})})),
+          h("label", null, "\u6240\u5C5E\u9636\u6BB5", h("select", {value:String(addFormData.phaseId), onChange:e=>setAddFormData({...addFormData, phaseId:e.target.value})},
+            h("option", {value:"none"}, "\u65E0"),
+            ...PHASES.filter(ph=>ph.projectId===selectedProject).map(ph => h("option", {key:ph.id, value:String(ph.id)}, ph.name)))),
+          h("label", null, "\u5907\u6CE8", h("input", {value:addFormData.notes, onChange:e=>setAddFormData({...addFormData, notes:e.target.value}), placeholder:"\u5907\u6CE8\u4FE1\u606F", style:{width:"120px"}})),
+          h("button", {className:"add-task-form-btn save", onClick:saveNewTask}, "\u4FDD\u5B58"),
+          h("button", {className:"add-task-form-btn cancel", onClick:cancelAddTask}, "\u53D6\u6D88")
+        ),
+        // Scrollable area with unified rows
+        h("div", {className:"gantt-scroll", style:{flex:1, overflow:"auto", position:"relative"}},
+          // Month header row
+          h("div", {style:{display:"flex", position:"sticky", top:0, zIndex:10, background:"#fafbfc", borderBottom:"1px solid #e5e7eb"}},
+            h("div", {className:"gantt-header-left", style:{width:leftW, minWidth:leftW, height:headerH1, display:"flex", alignItems:"center", position:"sticky", left:0, zIndex:11, background:"#fafbfc", gap:0}},
+              h("span", {style:{flex:numFlex, paddingLeft:4}}, "#",
+                h("div", {className:"col-resize-handle", onMouseDown:(e)=>startResize("num",e)})
+              ),
+              h("span", {style:{flex:nameFlex, paddingLeft:6}}, "\u4EFB\u52A1\u540D",
+                h("div", {className:"col-resize-handle", onMouseDown:(e)=>startResize("name",e)})
+              ),
+              showMembers && h("span", {style:{flex:membersFlex, paddingLeft:6}}, "\u8D1F\u8D23\u4EBA",
+                h("div", {className:"col-resize-handle", onMouseDown:(e)=>startResize("members",e)})
+              ),
+              showAnomaly && h("span", {style:{flex:anomalyFlex, paddingLeft:6}}, "\u5F02\u5E38",
+                h("div", {className:"col-resize-handle", onMouseDown:(e)=>startResize("anomaly",e)})
+              ),
+              showNotes && h("span", {style:{flex:notesFlex, paddingLeft:6}}, "\u5907\u6CE8",
+                h("div", {className:"col-resize-handle", onMouseDown:(e)=>startResize("notes",e)})
+              ),
+              showDone && h("span", {style:{flex:doneFlex, paddingLeft:6}}, "\u5B8C\u6210",
+                h("div", {className:"col-resize-handle", onMouseDown:(e)=>startResize("done",e)})
+              ),
+              h("span", {style:{flex:dateFlex, paddingLeft:6}}, "\u65F6\u95F4\u8303\u56F4")
+            ),
+            h("div", {className:"gantt-timeline-header", style:{width:totalDays*dayWidth}},
+              ...months.map(m => h("div", {key:m.k, className:"gantt-month-label", style:{width:m.days*dayWidth, height:headerH1, lineHeight:headerH1+"px"}}, m.label))
+            )
+          ),
+          // Day header row
+          h("div", {style:{display:"flex", position:"sticky", top:headerH1, zIndex:10, background:"#fff", borderBottom:"1px solid #e5e7eb"}},
+            h("div", {style:{width:leftW, minWidth:leftW, height:headerH2, borderBottom:"1px solid #e5e7eb", borderRight:"1px solid #e5e7eb", background:"#fafbfc", position:"sticky", left:0, zIndex:11}}),
+            h("div", {className:"gantt-timeline-header", style:{width:totalDays*dayWidth}},
+              ...days.map((d,i) => h("div", {key:i, className:`gantt-day-cell ${d.we?"weekend":""} ${d.today?"today":""}`, style:{height:headerH2, lineHeight:headerH2+"px"}}, d.day))
+            )
+          ),
+          // Edit hint
+          h("div", {style:{display:"flex", position:"sticky", top:headerH1+headerH2, zIndex:9, background:"#fafbfc", borderBottom:"1px solid #f0f0f0"}},
+            h("div", {style:{width:leftW, minWidth:leftW, padding:"4px 12px", fontSize:11, color:"#9ca3af", position:"sticky", left:0, zIndex:10, background:"#fafbfc"}},
+              "\u270F \u70B9\u51FB\u4EFB\u52A1\u540D\u79F0\u53EF\u7F16\u8F91\uFF0C\u70B9\u51FB\u65E5\u671F\u53EF\u4FEE\u6539\u65F6\u95F4\u8303\u56F4" + (showNotes ? "\uFF0C\u70B9\u51FB\u5907\u6CE8\u53EF\u7F16\u8F91" : "") + (showAnomaly ? "\uFF0C\u70B9\u51FB\u5F02\u5E38\u53EF\u7F16\u8F91" : "")),
+            h("div", {style:{width:totalDays*dayWidth}})
+          ),
+          // Task rows - each row is a unified flex row
+          ...rows.map((row,ri) => {
+            const rowTop = headerH1 + headerH2 + 24 + ri * 36; // for today line positioning
+
+            // Left panel content
+            let leftContent;
+            if(row.type==="ph") {
+              leftContent = h("div", {className:"gantt-phase-header", style:{width:leftW, minWidth:leftW, position:"sticky", left:0, zIndex:2, background:"#fafbfc"}, onClick:()=>toggle(row.ph.id)},
+                h("span", {className:`arrow ${row.col?"collapsed":""}`, style:{fontSize:10}}, "\u25BC"),
+                h("span", {style:{color:row.ph.color, fontWeight:700, fontSize:14}}, `${row.phaseNum}. ${row.ph.name}`),
+                h("span", {className:"count"}, `(${row.tasks.length})`)
+              );
+            } else if(row.type==="t") {
+              const isEditingName = editingId===row.t.id && editField==="name";
+              const isEditingDate = editingId===row.t.id && editField==="date";
+              const isEditingNotes = editingId===row.t.id && editField==="notes";
+              leftContent = h("div", {className:"gantt-task-left", style:{width:leftW, minWidth:leftW, position:"sticky", left:0, zIndex:2, background:"#fff", alignItems:"flex-start", paddingTop:8}},
+                h("span", {className:"num", style:{flex:numFlex, paddingTop:2, paddingLeft:4}}, `${row.phaseNum}.${row.taskNum}`),
+                isEditingName
+                  ? h("input", {className:"task-name-input", value:editName, onChange:e=>setEditName(e.target.value),
+                      onBlur:()=>saveName(row.t), onKeyDown:e=>{if(e.key==="Enter")saveName(row.t);if(e.key==="Escape")cancelEdit();},
+                      autoFocus:true, style:{flex:nameFlex, marginLeft:6}})
+                  : h("span", {className:"name", title:row.t.name, style:{flex:nameFlex,cursor:"text", whiteSpace:"pre-wrap", wordBreak:"break-word", lineHeight:1.4, paddingLeft:6}, onClick:(e)=>startNameEdit(row.t, e)},
+                      row.t.name),
+                showMembers && h("span", {className:"members-col", title:(row.t.members||[]).join(", "), style:{flex:membersFlex, fontSize:11, color:"#6b7280", whiteSpace:"pre-wrap", wordBreak:"break-word", lineHeight:1.4, paddingTop:2, paddingLeft:6, cursor:"text"}, onClick:(e)=>startMembersEdit(row.t, e)},
+                  (row.t.members||[]).length > 0 ? (row.t.members||[]).join("\n") : "\u2014"),
+                showAnomaly && h("span", {className:`notes-col ${row.t.anomaly?"has-notes":""}`, title:row.t.anomaly||"\u70B9\u51FB\u6DFB\u52A0\u5F02\u5E38",
+                    style:{flex:anomalyFlex, whiteSpace:"pre-wrap", wordBreak:"break-word", lineHeight:1.4, paddingTop:2, paddingLeft:6, cursor:"text"}, onClick:(e)=>startAnomalyEdit(row.t, e)},
+                    row.t.anomaly ? parseTextWithLinks(row.t.anomaly) : "\u2014"
+                ),
+                showNotes && h("span", {className:`notes-col ${row.t.notes?"has-notes":""}`, title:row.t.notes||"\u70B9\u51FB\u6DFB\u52A0\u5907\u6CE8",
+                    style:{flex:notesFlex, whiteSpace:"pre-wrap", wordBreak:"break-word", lineHeight:1.4, paddingTop:2, paddingLeft:6, cursor:"text"}, onClick:(e)=>startNotesEdit(row.t, e)},
+                    row.t.notes ? parseTextWithLinks(row.t.notes) : "\u2014"
+                ),
+                showDone && h("label", {style:{flex:doneFlex, display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", fontSize:12, paddingLeft:6}},
+                  h("input", {type:"checkbox", checked:!!row.t.done, onChange:()=>toggleDone(row.t), style:{marginRight:4}}),
+                  row.t.done ? "\u5DF2\u5B8C\u6210" : "\u672A\u5B8C\u6210"
+                ),
+                h("div", {className:"date-edit-wrap", style:{flex:dateFlex, paddingLeft:6}},
+                  isEditingDate ? null : h("span", {className:"date-range date-range-editable", onClick:(e)=>startDateEdit(row.t, e)},
+                    `${fmtShort(row.t.start)} - ${fmtShort(row.t.end)}`)
+                ),
+                h("button", {className:"task-delete-btn", title:"\u5220\u9664\u4EFB\u52A1", onClick:(e)=>{e.stopPropagation();deleteTask(row.t.id);}}, "\u00D7")
+              );
+            } else if(row.type==="ps") {
+              leftContent = h("div", {className:"gantt-task-left", style:{fontSize:12, width:leftW, minWidth:leftW, position:"sticky", left:0, zIndex:2, background:"#fafbfc"}},
+                h("span", {className:"name", style:{color:row.ph.color,fontWeight:600}},
+                  `${row.phaseNum}. ${row.ph.name}  \u25CF  ${fmtShort(row.rng.start)} - ${fmtShort(row.rng.end)}  \u25CF  ${row.dur}days  ${row.prog}%`)
+              );
+            }
+
+            // Right panel content (Gantt bars)
+            let rightContent;
+            if(row.type==="ph") {
+              if(row.col && row.rng.start && row.rng.end) {
+                const l=dayOffset(row.rng.start)*dayWidth, w=row.dur*dayWidth-4;
+                rightContent = h("div", {className:"gantt-bar-area", style:{width:totalDays*dayWidth, minHeight:36, display:"flex", alignItems:"flex-start", paddingTop:8}},
+                  h("div", {className:"gantt-bar", style:{left:l, width:w, background:row.ph.color, height:20, top:0, borderRadius:4, opacity:0.7}},
+                    h("div", {style:{position:"absolute",right:0,top:0,bottom:0,background:"rgba(255,255,255,0.3)",borderRadius:"0 4px 4px 0",width:`${row.prog}%`}})
+                  ),
+                  h("span", {className:"gantt-bar-label", style:{fontSize:11,fontWeight:500, top:2}}, `${row.prog}%`)
+                );
+              } else {
+                rightContent = h("div", {style:{width:totalDays*dayWidth, minHeight:36}});
+              }
+            } else if(row.type==="t") {
+              const l=dayOffset(row.t.start)*dayWidth, w=(daysBetween(row.t.start,row.t.end)+1)*dayWidth-4;
+              rightContent = h("div", {className:"gantt-bar-area", style:{width:totalDays*dayWidth, minHeight:36, display:"flex", alignItems:"flex-start", paddingTop:8}},
+                h("div", {className:"gantt-bar", style:{left:l, width:w, background:row.ph.color, opacity:row.t.done?1:0.55, top:0}},
+                  row.t.done ? h("div", {style:{position:"absolute",right:0,top:0,bottom:0,background:"rgba(255,255,255,0.35)",borderRadius:"0 4px 4px 0",width:"100%"}}) : null
+                ),
+                h("span", {className:"gantt-bar-label", style:{top:2}}, row.t.done ? "\u2713" : "\u2014")
+              );
+            } else if(row.type==="ps") {
+              rightContent = h("div", {style:{width:totalDays*dayWidth, minHeight:36}});
+            }
+
+            return h("div", {key:"row"+ri, style:{display:"flex", borderBottom:"1px solid #f0f0f0", minHeight:36, alignItems:"flex-start", position:"relative"},
+              className: row.type==="t" ? "gantt-task-row" : ""},
+              leftContent,
+              rightContent
+            );
+          }),
+          // Today line
+          h("div", {className:"gantt-today-line", style:{left: leftW + todayLeft, top: headerH1+headerH2+24, bottom:0}}),
+          h("div", {className:"gantt-today-label", style:{left: leftW + todayLeft - 20, top: headerH1+headerH2+24}}, "today")
+        ),
+        // Fixed popovers - rendered outside all overflow clipping containers
+        popPos && editingId && editField==="notes" && h("div", {className:"fixed-popover", style:{position:"fixed", left:popPos.x+"px", top:popPos.y+"px", zIndex:9999, maxWidth:400}},
+          h("div", {style:{display:"flex", flexDirection:"column", gap:6}},
+            h("textarea", {
+              ref: (el) => { if(el && !el._notesBound) { el._notesBound = true; window._notesInput = el; } },
+              value:editNotes, onChange:e=>setEditNotes(e.target.value), autoFocus:true,
+              onKeyDown:e=>{if(e.key==="Enter"&&(e.ctrlKey||e.metaKey)){e.preventDefault();saveNotes(TASKS.find(x=>x.id===editingId));}if(e.key==="Escape")cancelEdit();},
+              placeholder:"输入备注内容...\n\n点击「📎 插入链接」选择文件并添加链接",
+              rows:3,
+              style:{width:"100%", minWidth:300, resize:"vertical", fontFamily:"inherit", fontSize:13, padding:"6px 8px", border:"1px solid #d1d5db", borderRadius:4, outline:"none"}
+            }),
+            h("div", {style:{display:"flex", gap:6, alignItems:"center"}},
+              h("button", {className:"date-popover-btn save", onClick:()=>saveNotes(TASKS.find(x=>x.id===editingId))}, "保存"),
+              h("button", {className:"date-popover-btn cancel", onClick:cancelEdit}, "取消"),
+              h("button", {
+                className:"date-popover-btn save",
+                style:{marginLeft:"auto", fontSize:11, padding:"3px 10px"},
+                onClick: async ()=>{
+                  const input = window._notesInput;
+                  if(!input) return;
+                  const pos = input.selectionStart || editNotes.length;
+                  const before = editNotes.slice(0, pos);
+                  const after = editNotes.slice(pos);
+                  const linkTemplate = "[链接文字]";
+                  
+                  // Choose open mode first
+                  const useLocal = confirm("选择链接打开方式：\n\n确定 = 本地应用打开（需粘贴完整文件路径）\n取消 = 浏览器打开（选择文件）");
+                  
+                  if(useLocal) {
+                    const filePath = prompt("请输入文件的完整路径：\n例如：D:\\文档\\报告.pdf");
+                    if(!filePath) return;
+                    setEditNotes(before + linkTemplate + after);
+                    setEditNotes(prev => {
+                      const idx = prev.indexOf(linkTemplate, before.length - 1);
+                      if(idx !== -1) return prev.slice(0, idx) + "[链接文字](localopen://" + filePath + ")" + prev.slice(idx + linkTemplate.length);
+                      return prev + "[链接文字](localopen://" + filePath + ")";
+                    });
+                    setTimeout(()=>{
+                      input.focus();
+                      input.setSelectionRange(before.length + 1, before.length + 5);
+                    }, 50);
+                  } else {
+                    setEditNotes(before + linkTemplate + after);
+                    try {
+                      if(window.showOpenFilePicker) {
+                        const [handle] = await window.showOpenFilePicker({multiple:false});
+                        const file = await handle.getFile();
+                        const fileName = file.name;
+                        fileHandleCache.set(fileName, handle);
+                        setEditNotes(prev => {
+                          const idx = prev.indexOf(linkTemplate, before.length - 1);
+                          if(idx !== -1) return prev.slice(0, idx) + "[链接文字](" + fileName + ")" + prev.slice(idx + linkTemplate.length);
+                          return prev + "[链接文字](" + fileName + ")";
+                        });
+                        setTimeout(()=>{
+                          input.focus();
+                          input.setSelectionRange(before.length + 1, before.length + 5);
+                        }, 50);
+                      } else {
+                        const inp = document.createElement("input");
+                        inp.type = "file";
+                        inp.onchange = () => {
+                          const f = inp.files[0];
+                          if(!f) return;
+                          const fileName = f.name;
+                          setEditNotes(prev => {
+                            const idx = prev.indexOf(linkTemplate);
+                            if(idx !== -1) return prev.slice(0, idx) + "[链接文字](" + fileName + ")" + prev.slice(idx + linkTemplate.length);
+                            return prev + "[链接文字](" + fileName + ")";
+                          });
+                          setTimeout(()=>{
+                            input.focus();
+                            input.setSelectionRange(before.length + 1, before.length + 5);
+                          }, 50);
+                        };
+                        inp.click();
+                      }
+                    } catch(e) {
+                      setTimeout(()=>{
+                        input.focus();
+                        input.setSelectionRange(before.length + 1, before.length + 5);
+                      }, 50);
+                    }
+                  }
+                }
+              }, "📎 插入链接")
+            ),
+            h("div", {style:{fontSize:10, color:"#9ca3af", lineHeight:1.4}},
+              "链接格式：[显示文字](文件名) · 显示时只看到蓝色链接文字，点击可打开文件"
+            )
+          )
+        ),
+        popPos && editingId && editField==="anomaly" && h("div", {className:"fixed-popover", style:{position:"fixed", left:popPos.x+"px", top:popPos.y+"px", zIndex:9999, maxWidth:400}},
+          h("div", {style:{display:"flex", flexDirection:"column", gap:6}},
+            h("textarea", {
+              ref: (el) => { if(el && !el._anomalyBound) { el._anomalyBound = true; window._anomalyInput = el; } },
+              value:editAnomaly, onChange:e=>setEditAnomaly(e.target.value), autoFocus:true,
+              onKeyDown:e=>{if(e.key==="Enter"&&(e.ctrlKey||e.metaKey)){e.preventDefault();saveAnomaly(TASKS.find(x=>x.id===editingId));}if(e.key==="Escape")cancelEdit();},
+              placeholder:"输入异常信息...\n\n点击「📎 插入链接」选择文件并添加链接",
+              rows:3,
+              style:{width:"100%", minWidth:300, resize:"vertical", fontFamily:"inherit", fontSize:13, padding:"6px 8px", border:"1px solid #d1d5db", borderRadius:4, outline:"none"}
+            }),
+            h("div", {style:{display:"flex", gap:6, alignItems:"center"}},
+              h("button", {className:"date-popover-btn save", onClick:()=>saveAnomaly(TASKS.find(x=>x.id===editingId))}, "保存"),
+              h("button", {className:"date-popover-btn cancel", onClick:cancelEdit}, "取消"),
+              h("button", {
+                className:"date-popover-btn save",
+                style:{marginLeft:"auto", fontSize:11, padding:"3px 10px"},
+                onClick: async ()=>{
+                  const input = window._anomalyInput;
+                  if(!input) return;
+                  const pos = input.selectionStart || editAnomaly.length;
+                  const before = editAnomaly.slice(0, pos);
+                  const after = editAnomaly.slice(pos);
+                  const linkTemplate = "[链接文字]";
+                  
+                  const useLocal = confirm("选择链接打开方式：\n\n确定 = 本地应用打开（需粘贴完整文件路径）\n取消 = 浏览器打开（选择文件）");
+                  
+                  if(useLocal) {
+                    const filePath = prompt("请输入文件的完整路径：\n例如：D:\\文档\\报告.pdf");
+                    if(!filePath) return;
+                    setEditAnomaly(before + linkTemplate + after);
+                    setEditAnomaly(prev => {
+                      const idx = prev.indexOf(linkTemplate, before.length - 1);
+                      if(idx !== -1) return prev.slice(0, idx) + "[链接文字](localopen://" + filePath + ")" + prev.slice(idx + linkTemplate.length);
+                      return prev + "[链接文字](localopen://" + filePath + ")";
+                    });
+                    setTimeout(()=>{
+                      input.focus();
+                      input.setSelectionRange(before.length + 1, before.length + 5);
+                    }, 50);
+                  } else {
+                    setEditAnomaly(before + linkTemplate + after);
+                    try {
+                      if(window.showOpenFilePicker) {
+                        const [handle] = await window.showOpenFilePicker({multiple:false});
+                        const file = await handle.getFile();
+                        const fileName = file.name;
+                        fileHandleCache.set(fileName, handle);
+                        setEditAnomaly(prev => {
+                          const idx = prev.indexOf(linkTemplate, before.length - 1);
+                          if(idx !== -1) return prev.slice(0, idx) + "[链接文字](" + fileName + ")" + prev.slice(idx + linkTemplate.length);
+                          return prev + "[链接文字](" + fileName + ")";
+                        });
+                        setTimeout(()=>{
+                          input.focus();
+                          input.setSelectionRange(before.length + 1, before.length + 5);
+                        }, 50);
+                      } else {
+                        const inp = document.createElement("input");
+                        inp.type = "file";
+                        inp.onchange = () => {
+                          const f = inp.files[0];
+                          if(!f) return;
+                          const fileName = f.name;
+                          setEditAnomaly(prev => {
+                            const idx = prev.indexOf(linkTemplate);
+                            if(idx !== -1) return prev.slice(0, idx) + "[链接文字](" + fileName + ")" + prev.slice(idx + linkTemplate.length);
+                            return prev + "[链接文字](" + fileName + ")";
+                          });
+                          setTimeout(()=>{
+                            input.focus();
+                            input.setSelectionRange(before.length + 1, before.length + 5);
+                          }, 50);
+                        };
+                        inp.click();
+                      }
+                    } catch(e) {
+                      setTimeout(()=>{
+                        input.focus();
+                        input.setSelectionRange(before.length + 1, before.length + 5);
+                      }, 50);
+                    }
+                  }
+                }
+              }, "📎 插入链接")
+            ),
+            h("div", {style:{fontSize:10, color:"#9ca3af", lineHeight:1.4}},
+              "链接格式：[显示文字](文件名) · 显示时只看到蓝色链接文字，点击可打开文件"
+            )
+          )
+        ),
+        popPos && editingId && editField==="members" && h("div", {className:"fixed-popover", ref:membersPopRef, style:{position:"fixed", left:popPos.x+"px", top:popPos.y+"px", zIndex:9999, maxWidth:300}},
+          h("div", {style:{display:"flex", flexDirection:"column", gap:6}},
+            h("textarea", {
+              value:editMembers, onChange:e=>setEditMembers(e.target.value), autoFocus:true,
+              onKeyDown:e=>{if(e.key==="Enter"&&(e.ctrlKey||e.metaKey)){e.preventDefault();saveMembers(TASKS.find(x=>x.id===editingId));}if(e.key==="Escape")cancelEdit();},
+              placeholder:"输入负责人，每行一个\n例如：\n张三\n李四",
+              rows:4,
+              style:{width:"100%", minWidth:200, resize:"vertical", fontFamily:"inherit", fontSize:13, padding:"6px 8px", border:"1px solid #d1d5db", borderRadius:4, outline:"none"}
+            }),
+            h("div", {style:{display:"flex", gap:6, alignItems:"center"}},
+              h("button", {className:"date-popover-btn save", onClick:()=>saveMembers(TASKS.find(x=>x.id===editingId))}, "保存"),
+              h("button", {className:"date-popover-btn cancel", onClick:cancelEdit}, "取消")
+            ),
+            h("div", {style:{fontSize:10, color:"#9ca3af", lineHeight:1.4}},
+              "每行一个负责人，也可用逗号分隔"
+            )
+          )
+        ),
+        popPos && editingId && editField==="date" && h("div", {className:"fixed-popover", style:{position:"fixed", left:popPos.x+"px", top:popPos.y+"px", zIndex:9999}},
+          h("span", {style:{fontSize:11,color:"#6b7280"}}, "\u5F00\u59CB"),
+          h("input", {type:"date", value:editStart, onChange:e=>setEditStart(e.target.value)}),
+          h("span", {style:{fontSize:11,color:"#6b7280"}}, "\u622A\u6B62"),
+          h("input", {type:"date", value:editEnd, onChange:e=>setEditEnd(e.target.value)}),
+          h("button", {className:"date-popover-btn save", onClick:()=>saveDate(TASKS.find(x=>x.id===editingId))}, "\u4FDD\u5B58"),
+          h("button", {className:"date-popover-btn cancel", onClick:cancelEdit}, "\u53D6\u6D88")
+        )
+      )
+      ;
+    }
+
+    function CalendarView({ selectedProject }) {
+      const today = new Date();
+      const [monthOffset, setMonthOffset] = useState(0);
+      const [listMode, setListMode] = useState(false);
+      const [searchQuery, setSearchQuery] = useState("");
+      const [renderKey, setRenderKey] = useState(0);
+      const [editTask, setEditTask] = useState(null);
+      const [editTaskData, setEditTaskData] = useState(null);
+      const [createTask, setCreateTask] = useState(null);
+      const [createTaskData, setCreateTaskData] = useState(null);
+      const [customRange, setCustomRange] = useState(false);
+      const [customStart, setCustomStart] = useState(fmtDate(new Date(today.getFullYear(), today.getMonth(), 1)));
+      const [customEnd, setCustomEnd] = useState(fmtDate(new Date(today.getFullYear(), today.getMonth() + 1, 0)));
+      const triggerRender = () => setRenderKey(k => k + 1);
+      useEffect(() => { onGlobalRender(triggerRender); }, []);
+      const saveTaskEdit = () => {
+        const t = TASKS.find(x => x.id === editTask);
+        if(t && editTaskData.name.trim()) { t.name=editTaskData.name; t.start=editTaskData.start; t.end=editTaskData.end; t.notes=editTaskData.notes; t.done=editTaskData.done; }
+        autoSave(); setEditTask(null); triggerRender();
+      };
+      const saveNewCalTask = () => {
+        if(!createTaskData.name.trim()) return;
+        TASKS.push({ id:nextTaskId(), phaseId:null, projectId:selectedProject, name:createTaskData.name.trim(), start:createTaskData.start, end:createTaskData.end, done:false, members:[], hours:0, cost:0, notes:createTaskData.notes||"", anomaly:"" });
+        autoSave(); setCreateTask(null); triggerRender();
+      };
+      const deleteCalTask = (taskId) => { const idx=TASKS.findIndex(t=>t.id===taskId); if(idx!==-1)TASKS.splice(idx,1); autoSave(); setEditTask(null); triggerRender(); };
+
+      // Compute display days
+      let wd, displayLabel;
+      if(customRange) {
+        const numDays = Math.max(1, daysBetween(customStart, customEnd) + 1);
+        wd = Array.from({length: Math.min(numDays, 365)}, (_,i) => addDays(customStart, i));
+        displayLabel = `${customStart} ~ ${customEnd}`;
+      } else {
+        const base = new Date(today.getFullYear(), today.getMonth() + monthOffset, 1);
+        const y = base.getFullYear(), m = base.getMonth();
+        const daysInMonth = new Date(y, m + 1, 0).getDate();
+        wd = Array.from({length: daysInMonth}, (_,i) => fmtDate(new Date(y, m, i + 1)));
+        displayLabel = `${y}年${m + 1}月`;
+      }
+      const dnShort = ["日","一","二","三","四","五","六"];
+      const filteredTasks = TASKS.filter(t => t.projectId === selectedProject);
+      const searchedTasks = searchQuery.trim()
+        ? filteredTasks.filter(t => t.name.includes(searchQuery.trim()) || (t.notes && t.notes.includes(searchQuery.trim())))
+        : filteredTasks;
+      const wkTasks = searchedTasks.filter(t=>wd.some(d=>{const td=parseDate(d),ts=parseDate(t.start),te=parseDate(t.end);return td>=ts&&td<=te;}));
+      // Assign rows to handle overlapping tasks
+      const sortedTasks = [...wkTasks].sort((a,b)=>parseDate(a.start)-parseDate(b.start));
+      const taskRows = {};
+      sortedTasks.forEach(task => {
+        const ts=parseDate(task.start), te=parseDate(task.end);
+        let row = 0;
+        while(true) {
+          let conflict = false;
+          for(const [tid, trow] of Object.entries(taskRows)) {
+            if(trow === row) {
+              const other = sortedTasks.find(t=>String(t.id)===tid);
+              if(other) {
+                const ots=parseDate(other.start), ote=parseDate(other.end);
+                if(ts<=ote && te>=ots) { conflict=true; break; }
+              }
+            }
+          }
+          if(!conflict) break;
+          row++;
+        }
+        taskRows[task.id] = row;
+        task.row = row;
+      });
+      const maxRow = sortedTasks.length > 0 ? Math.max(...sortedTasks.map(t=>t.row||0)) : 0;
+      const pc = {}; PROJECTS.forEach(p=>{pc[p.id]=p.color;});
+
+      return h(React.Fragment, null,
+        h("div", {className:"calendar-container"},
+        h("div", {className:"calendar-header-bar"},
+          h("div", {className:"calendar-date-range"},
+            h("span", null, displayLabel),
+            !customRange && h(React.Fragment, null,
+              h("button", {className:"calendar-nav-btn", onClick:()=>setMonthOffset(m=>m-1)}, "\u2039"),
+              h("button", {className:"calendar-nav-btn", onClick:()=>setMonthOffset(m=>m+1)}, "\u203A"),
+              h("button", {className:"calendar-nav-btn", onClick:()=>setMonthOffset(0), style:{fontSize:11, width:"auto", padding:"0 8px"}}, "\u4ECA\u6708")
+            ),
+            customRange && h(React.Fragment, null,
+              h("input", {type:"date", value:customStart, onChange:e=>setCustomStart(e.target.value), style:{marginLeft:8, padding:"2px 6px", border:"1px solid #d1d5db", borderRadius:4, fontSize:12}}),
+              h("span", {style:{fontSize:12, color:"#6b7280"}}, "~"),
+              h("input", {type:"date", value:customEnd, onChange:e=>setCustomEnd(e.target.value), style:{padding:"2px 6px", border:"1px solid #d1d5db", borderRadius:4, fontSize:12}})
+            )
+          ),
+          h("button", {className:`calendar-nav-btn ${customRange?"active":""}`, onClick:()=>setCustomRange(!customRange), style:{fontSize:11, width:"auto", padding:"0 8px", background:customRange?"#eef2ff":"#fff", borderColor:customRange?"#4f46e5":"#e5e7eb", color:customRange?"#4f46e5":"#374151"}}, customRange ? "\u81EA\u5B9A\u4E49" : "\u6309\u6708"),
+          h("input", {className:"calendar-search", placeholder:"\u641C\u7D22\u4EFB\u52A1\u540D\u6216\u5907\u6CE8...", value:searchQuery,
+            onChange:e=>setSearchQuery(e.target.value)}),
+          h("div", {style:{marginLeft:"auto"}},
+            h("div", {className:"calendar-view-toggle"},
+              h("button", {className:`calendar-view-btn ${!listMode?"active":""}`, onClick:()=>setListMode(false)}, "Calendar"),
+              h("button", {className:`calendar-view-btn ${listMode?"active":""}`, onClick:()=>setListMode(true)}, "List")
+            )
+          )
+        ),
+        h("div", {className:"calendar-project-bar"},
+          ...PROJECTS.filter(p=>p.id===selectedProject && filteredTasks.length>0).map(p=>{
+            const pts=filteredTasks; const totalH=pts.reduce((s,t)=>s+t.hours,0);
+            return h("div", {key:p.id, className:"calendar-project-segment", style:{width:"100%",background:p.color}}, `${p.name}  ${fmtHours(totalH)}`);
+          })
+        ),
+        // Calendar grid mode - Gantt-style continuous bars
+        !listMode && h("div", {className:"calendar-grid"},
+          // Day headers
+          h("div", {className:"calendar-day-headers"},
+            ...wd.map((d,i)=>{
+              const dt=parseDate(d), isT=d===TODAY;
+              const compact = wd.length > 14;
+              return h("div", {key:`h-${i}`, className:`calendar-day-header ${isT?"today-col":""}`, style:{minWidth: compact ? 32 : undefined}},
+                h("div", {className:"day-num", style: compact ? {fontSize:14, width:24, height:24} : {}}, dt.getDate()),
+                h("div", {className:"day-name", style: compact ? {fontSize:10} : {}}, dnShort[dt.getDay()])
+              );
+            })
+          ),
+          // Task area with continuous bars
+          h("div", {className:"calendar-task-area", style:{minHeight: Math.max(200, (maxRow+1)*48+16)+"px", minWidth: wd.length > 14 ? wd.length * 32 : undefined}},
+            // Day column backgrounds
+            ...wd.map((d,i)=>{
+              const dt=parseDate(d), isT=d===TODAY;
+              const isWeekend = dt.getDay()===0||dt.getDay()===6;
+              return h("div", {key:`col-${i}`, className:`calendar-day-col ${isWeekend?"weekend":""} ${isT?"today-cell":""}`, style:{cursor:"pointer", minWidth: wd.length > 14 ? 32 : undefined}, onClick:()=>{setCreateTask(d);setCreateTaskData({name:"",start:d,end:d,notes:""});}});
+            }),
+            // Task bars positioned absolutely
+            ...wkTasks.map((task) => {
+              const co=pc[task.projectId]||"#6366f1";
+              const ts=parseDate(task.start), te=parseDate(task.end);
+              let startIdx=-1, endIdx=-1;
+              wd.forEach((d,i)=>{
+                const td=parseDate(d);
+                if(td>=ts && td<=te) {
+                  if(startIdx===-1) startIdx=i;
+                  endIdx=i;
+                }
+              });
+              if(startIdx===-1) return null;
+              const spanDays = endIdx - startIdx + 1;
+              const rowH = 44;
+              const top = 8 + task.row * (rowH + 4);
+              const height = rowH;
+              const totalCols = wd.length;
+              return h("div", {key:task.id, className:"calendar-task-bar", style:{
+                left:`calc(${startIdx * 100/totalCols}% + 2px)`,
+                width:`calc(${spanDays * 100/totalCols}% - 4px)`,
+                top: top + "px",
+                height: height + "px",
+                background: co+"25",
+                borderLeft:`3px solid ${co}`
+              }, onClick:(e)=>{e.stopPropagation();setEditTask(task.id);setEditTaskData({name:task.name,start:task.start,end:task.end,notes:task.notes||"",done:task.done});}},
+                h("div", {className:"task-progress", style:{background:task.done?"#10b981":"#9ca3af"}}, task.done ? "\u2713" : "\u2014"),
+                h("div", {className:"task-name"}, task.name),
+                h("div", {className:"task-member"}, task.members.join(", ")),
+                task.notes && h("div", {className:"task-notes"}, task.notes)
+              );
+            })
+          )
+        ),
+        // List mode
+        listMode && h("div", null,
+          h("table", {className:"calendar-list-table"},
+            h("thead", null, h("tr", null,
+              h("th", null, "\u4EFB\u52A1"), h("th", null, "\u65E5\u671F"), h("th", null, "\u8D1F\u8D23\u4EBA"),
+              h("th", null, "\u8FDB\u5EA6"), h("th", null, "\u5907\u6CE8")
+            )),
+            h("tbody", null,
+              searchedTasks.length === 0
+                ? h("tr", null, h("td", {colSpan:5, style:{textAlign:"center",color:"#9ca3af",padding:24}},
+                    searchQuery ? `\u672A\u627E\u5230\u5339\u914D\u201C${searchQuery}\u201D\u7684\u4EFB\u52A1` : "\u5F53\u524D\u8303\u56F4\u65E0\u4EFB\u52A1"))
+                : searchedTasks.map((t,i) => {
+                  const proj = PROJECTS.find(p=>p.id===t.projectId);
+                  return h("tr", {key:t.id},
+                    h("td", {style:{fontWeight:500}},
+                      h("span", {className:"color-dot", style:{background:proj?proj.color:"#999",marginRight:6}}), t.name),
+                    h("td", null, `${fmtShort(t.start)} - ${fmtShort(t.end)}`),
+                    h("td", null, t.members.join(", ") || "-"),
+                    h("td", null, h("div", {className:"progress-bar-container"},
+                      h("span", {style:{color:t.done?"#10b981":"#9ca3af", fontWeight:600}}, t.done ? "\u2713 \u5DF2\u5B8C\u6210" : "\u2014 \u672A\u5B8C\u6210")
+                    )),
+                    h("td", {style:{color:t.notes?"#374151":"#d1d5db"}}, t.notes || "-")
+                  );
+                })
+            )
+          )
+        ),
+        ),
+        // Edit task modal
+        editTask && editTaskData && h("div", {className:"modal-overlay", onClick:()=>setEditTask(null)},
+          h("div", {className:"modal-box", onClick:e=>e.stopPropagation()},
+            h("div", {className:"modal-title"}, "\u7F16\u8F91\u4EFB\u52A1"),
+            h("div", {style:{marginBottom:10}},
+              h("label", {className:"modal-label"}, "\u4EFB\u52A1\u540D"),
+              h("input", {className:"modal-input", value:editTaskData.name, onChange:e=>setEditTaskData({...editTaskData, name:e.target.value}), autoFocus:true})
+            ),
+            h("div", {style:{display:"flex", gap:10, marginBottom:10}},
+              h("div", {style:{flex:1}},
+                h("label", {className:"modal-label"}, "\u5F00\u59CB\u65E5\u671F"),
+                h("input", {className:"modal-input", type:"date", value:editTaskData.start, onChange:e=>setEditTaskData({...editTaskData, start:e.target.value})})
+              ),
+              h("div", {style:{flex:1}},
+                h("label", {className:"modal-label"}, "\u622A\u6B62\u65E5\u671F"),
+                h("input", {className:"modal-input", type:"date", value:editTaskData.end, onChange:e=>setEditTaskData({...editTaskData, end:e.target.value})})
+              )
+            ),
+            h("div", {style:{marginBottom:10}},
+              h("label", {className:"modal-label"}, "\u5907\u6CE8"),
+              h("input", {className:"modal-input", value:editTaskData.notes, onChange:e=>setEditTaskData({...editTaskData, notes:e.target.value}), placeholder:"\u5907\u6CE8\u4FE1\u606F"})
+            ),
+            h("div", {style:{marginBottom:10}},
+              h("label", {style:{display:"flex", alignItems:"center", gap:8, fontSize:13, cursor:"pointer"}},
+                h("input", {type:"checkbox", checked:!!editTaskData.done, onChange:e=>setEditTaskData({...editTaskData, done:e.target.checked})}),
+                "\u5DF2\u5B8C\u6210"
+              )
+            ),
+            h("div", {className:"modal-actions"},
+              h("button", {className:"modal-btn danger", onClick:()=>deleteCalTask(editTask), style:{marginRight:"auto"}}, "\u5220\u9664"),
+              h("button", {className:"modal-btn secondary", onClick:()=>setEditTask(null)}, "\u53D6\u6D88"),
+              h("button", {className:"modal-btn primary", onClick:saveTaskEdit}, "\u4FDD\u5B58")
+            )
+          )
+        ),
+        // Create task modal
+        createTask && createTaskData && h("div", {className:"modal-overlay", onClick:()=>setCreateTask(null)},
+          h("div", {className:"modal-box", onClick:e=>e.stopPropagation()},
+            h("div", {className:"modal-title"}, "\u65B0\u5EFA\u4EFB\u52A1"),
+            h("div", {style:{marginBottom:10}},
+              h("label", {className:"modal-label"}, "\u4EFB\u52A1\u540D"),
+              h("input", {className:"modal-input", value:createTaskData.name, onChange:e=>setCreateTaskData({...createTaskData, name:e.target.value}), autoFocus:true, placeholder:"\u8F93\u5165\u4EFB\u52A1\u540D\u79F0",
+                onKeyDown:e=>{if(e.key==="Enter")saveNewCalTask();}})
+            ),
+            h("div", {style:{display:"flex", gap:10, marginBottom:10}},
+              h("div", {style:{flex:1}},
+                h("label", {className:"modal-label"}, "\u5F00\u59CB\u65E5\u671F"),
+                h("input", {className:"modal-input", type:"date", value:createTaskData.start, onChange:e=>setCreateTaskData({...createTaskData, start:e.target.value})})
+              ),
+              h("div", {style:{flex:1}},
+                h("label", {className:"modal-label"}, "\u622A\u6B62\u65E5\u671F"),
+                h("input", {className:"modal-input", type:"date", value:createTaskData.end, onChange:e=>setCreateTaskData({...createTaskData, end:e.target.value})})
+              )
+            ),
+            h("div", {style:{marginBottom:10}},
+              h("label", {className:"modal-label"}, "\u5907\u6CE8"),
+              h("input", {className:"modal-input", value:createTaskData.notes, onChange:e=>setCreateTaskData({...createTaskData, notes:e.target.value}), placeholder:"\u5907\u6CE8\u4FE1\u606F"})
+            ),
+            h("div", {className:"modal-actions"},
+              h("button", {className:"modal-btn secondary", onClick:()=>setCreateTask(null)}, "\u53D6\u6D88"),
+              h("button", {className:"modal-btn primary", onClick:saveNewCalTask}, "\u521B\u5EFA")
+            )
+          )
+        )
+      );
+    }
+
+    function DashboardView({ selectedProject, setView, setSelectedProject }) {
+      const today = TODAY;
+      const todayD = parseDate(today);
+      const in7 = fmtDate(new Date(todayD.getTime() + 7*864e5));
+      const weekAgo = fmtDate(new Date(todayD.getTime() - 7*864e5));
+      const PC=["#7c3aed","#a0785a","#ec4899","#3b82f6","#10b981","#f97316","#06b6d4","#ef4444"];
+      const MC=["#3b82f6","#10b981","#f59e0b","#ef4444"];
+      const [editingReviewId, setEditingReviewId] = useState(null);
+      const [editingReviewText, setEditingReviewText] = useState("");
+      const [expandedCustomer, setExpandedCustomer] = useState(null); // projectId of expanded customer info
+      const [editingCustomer, setEditingCustomer] = useState(null); // projectId being edited
+      const [customerForm, setCustomerForm] = useState({name:"", contact:"", phone:"", email:"", notes:""});
+
+      // 1. Project overview data
+      const projectCards = PROJECTS.map(p => {
+        const tasks = TASKS.filter(t => t.projectId === p.id);
+        const done = tasks.filter(t => t.done).length;
+        const total = tasks.length;
+        const prog = total ? Math.round(done/total*100) : 0;
+        const phases = PHASES.filter(ph => ph.projectId === p.id).sort((a,b) => a.order - b.order);
+        const currentPhase = phases.find(ph => { const pt = tasks.filter(t => t.phaseId === ph.id); return pt.length > 0 && !pt.every(t => t.done); });
+        const hasOverdue = tasks.some(t => !t.done && t.end < today);
+        const status = total === 0 ? "empty" : done === total ? "done" : hasOverdue ? "overdue" : "normal";
+        const hrs = totalHours(tasks);
+        const cost = totalCost(tasks);
+        return { ...p, tasks, done, total, prog, currentPhase, status, hrs, cost };
+      }).sort((a,b) => a.prog - b.prog);
+
+      // 2. Overdue + upcoming tasks (all projects)
+      const overdueTasks = TASKS.filter(t => !t.done && t.end < today).sort((a,b) => a.end.localeCompare(b.end));
+      const upcomingTasks = TASKS.filter(t => !t.done && t.end >= today && t.end <= in7).sort((a,b) => a.end.localeCompare(b.end));
+
+      // 3. Recently completed (end date within last 7 days and done)
+      const recentDone = TASKS.filter(t => t.done && t.end >= weekAgo && t.end <= today).sort((a,b) => b.end.localeCompare(a.end));
+
+      // 4. Member workload
+      const allMembers = new Set(TASKS.flatMap(t => t.members));
+      const memberData = [...allMembers].map(m => {
+        const tasks = TASKS.filter(t => t.members.includes(m));
+        const done = tasks.filter(t => t.done).length;
+        return { name: m, total: tasks.length, done, hrs: totalHours(tasks) };
+      }).sort((a,b) => b.total - a.total);
+
+      // 5. Phase progress for selected project
+      const selPhases = PHASES.filter(ph => ph.projectId === selectedProject).sort((a,b) => a.order - b.order);
+      const selProj = PROJECTS.find(p => p.id === selectedProject);
+
+      // 6. Cost/hours totals
+      const allTasks = TASKS;
+      const totalHrs = totalHours(allTasks);
+      const totalCostAll = totalCost(allTasks);
+      const projectCostData = PROJECTS.map(p => {
+        const tasks = TASKS.filter(t => t.projectId === p.id);
+        return { name: p.name.slice(0,10), color: p.color, cost: totalCost(tasks), hrs: totalHours(tasks) };
+      }).filter(d => d.cost > 0 || d.hrs > 0);
+      const memberCostData = memberData.filter(d => d.hrs > 0).map(d => ({name:d.name, value:d.hrs}));
+
+      // Task status distribution data
+      const doneCount = TASKS.filter(t => t.done).length;
+      const overdueCount = overdueTasks.length;
+      const upcomingCount = upcomingTasks.length;
+      const pendingCount = TASKS.filter(t => !t.done && t.end > in7).length;
+      const statusData = [
+        { name: "\u5DF2\u5B8C\u6210", value: doneCount, color: "#10b981" },
+        { name: "\u8FDB\u884C\u4E2D", value: upcomingCount, color: "#f59e0b" },
+        { name: "\u8D85\u671F", value: overdueCount, color: "#ef4444" },
+        { name: "\u672A\u5F00\u59CB", value: pendingCount, color: "#9ca3af" }
+      ].filter(d => d.value > 0);
+
+      // Weekly completion trend (last 8 weeks)
+      const weeklyData = useMemo(() => {
+        const weeks = [];
+        for (let i = 7; i >= 0; i--) {
+          const weekStart = new Date(todayD.getTime() - i * 7 * 864e5);
+          const weekEnd = new Date(weekStart.getTime() + 6 * 864e5);
+          const count = TASKS.filter(t => {
+            if (!t.done) return false;
+            const endD = parseDate(t.end);
+            return endD >= weekStart && endD <= weekEnd;
+          }).length;
+          weeks.push({
+            week: `${weekStart.getMonth()+1}/${weekStart.getDate()}`,
+            count
+          });
+        }
+        return weeks;
+      }, [TASKS, todayD]);
+
+      const goToTask = (task) => { setSelectedProject(task.projectId); setView("gantt"); };
+      const reviewRef = useRef(null);
+      const scrollToReview = () => { if(reviewRef.current) reviewRef.current.scrollIntoView({behavior:"smooth", block:"start"}); };
+
+      return h("div", {className:"dashboard-container", style:{overflowY:"auto", flex:1}},
+        // ─ Nav ──
+        h("div", {style:{display:"flex", justifyContent:"flex-end", marginBottom:12}},
+          h("button", {style:{padding:"4px 14px", borderRadius:6, border:"1px solid #e5e7eb", background:"#fff", fontSize:12, cursor:"pointer", color:"#4f46e5"}, onClick:scrollToReview}, "\u2193 \u590D\u76D8\u7ED3\u679C")
+        ),
+
+        // ── Row 1: Project Overview (full width, auto-wrap) ──
+        h("div", {style:{marginBottom:16}},
+          h("div", {style:{fontSize:15, fontWeight:700, color:"#1f2937", marginBottom:12}}, "\u9879\u76EE\u8FDB\u5EA6\u603B\u89C8"),
+          h("div", {style:{display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(280px, 1fr))", gap:10}},
+            ...projectCards.map(pc => {
+              const isExpanded = expandedCustomer === pc.id;
+              const isEditing = editingCustomer === pc.id;
+              const cust = pc.customer || {name:"", contact:"", phone:"", email:"", notes:""};
+              const hasCustomer = cust.name || cust.contact || cust.phone || cust.email;
+              return h("div", {key:pc.id, className:"dash-proj-card", style:{cursor:"pointer"}},
+                // Project header (clickable to navigate)
+                h("div", {style:{cursor:"pointer"}, onClick:()=>{setSelectedProject(pc.id); setView("gantt");}},
+                  h("div", {style:{display:"flex", alignItems:"center", gap:8, marginBottom:10}},
+                    h("span", {style:{width:10, height:10, borderRadius:"50%", background:pc.color, flexShrink:0}}),
+                    h("span", {style:{fontSize:14, fontWeight:600, flex:1, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}, pc.name),
+                    pc.status === "done" && h("span", {style:{fontSize:10, background:"#d1fae5", color:"#065f46", padding:"2px 6px", borderRadius:8, fontWeight:600}}, "\u5DF2\u5B8C\u6210"),
+                    pc.status === "overdue" && h("span", {style:{fontSize:10, background:"#fee2e2", color:"#991b1b", padding:"2px 6px", borderRadius:8, fontWeight:600}}, "\u8D85\u671F"),
+                    pc.status === "normal" && h("span", {style:{fontSize:10, background:"#dbeafe", color:"#1e40af", padding:"2px 6px", borderRadius:8, fontWeight:600}}, "\u8FDB\u884C\u4E2D")
+                  ),
+                  h("div", {style:{display:"flex", alignItems:"center", gap:8, marginBottom:8}},
+                    h("div", {className:"progress-bar", style:{flex:1, height:8}},
+                      h("div", {className:"progress-bar-fill", style:{width:`${pc.prog}%`, background: pc.status==="done" ? "#10b981" : pc.color}})
+                    ),
+                    h("span", {style:{fontSize:13, fontWeight:700, color:"#374151", minWidth:38, textAlign:"right"}}, `${pc.prog}%`)
+                  ),
+                  h("div", {style:{fontSize:12, color:"#6b7280", display:"flex", justifyContent:"space-between"}},
+                    h("span", null, `${pc.done}/${pc.total} \u4EFB\u52A1`),
+                    pc.currentPhase ? h("span", {style:{color:pc.currentPhase.color}}, pc.currentPhase.name) : h("span", null, "\u2014")
+                  )
+                ),
+                // Customer info toggle
+                hasCustomer && h("div", {style:{marginTop:8, paddingTop:8, borderTop:"1px solid #f0f0f0"}},
+                  h("div", {style:{display:"flex", alignItems:"center", justifyContent:"space-between", cursor:"pointer"}, onClick:(e)=>{e.stopPropagation(); setExpandedCustomer(isExpanded ? null : pc.id);}},
+                    h("span", {style:{fontSize:11, color:"#6b7280"}}, "\u{1F464} " + (cust.name || "\u5BA2\u6237\u4FE1\u606F")),
+                    h("span", {style:{fontSize:10, color:"#9ca3af"}}, isExpanded ? "\u25B2" : "\u25BC")
+                  ),
+                  isExpanded && h("div", {style:{marginTop:6, fontSize:11, color:"#6b7280", lineHeight:1.6}, onClick:(e)=>e.stopPropagation()},
+                    cust.contact && h("div", null, "\u8054\u7CFB\u4EBA: " + cust.contact),
+                    cust.phone && h("div", null, "\u7535\u8BDD: " + cust.phone),
+                    cust.email && h("div", null, "\u90AE\u7BB1: " + cust.email),
+                    cust.notes && h("div", {style:{marginTop:4, color:"#9ca3af"}}, cust.notes)
+                  )
+                ),
+                // Edit customer button
+                h("div", {style:{marginTop:6, textAlign:"right"}, onClick:(e)=>e.stopPropagation()},
+                  h("button", {
+                    style:{padding:"2px 8px", borderRadius:4, border:"1px solid #e5e7eb", background:"#fff", fontSize:10, cursor:"pointer", color:"#6b7280"},
+                    onClick: () => {
+                      if(isEditing) {
+                        // Save
+                        const proj = PROJECTS.find(p => p.id === pc.id);
+                        if(proj) { proj.customer = {...customerForm}; }
+                        setEditingCustomer(null);
+                        autoSave();
+                      } else {
+                        // Start editing
+                        setEditingCustomer(pc.id);
+                        setCustomerForm(cust);
+                      }
+                    }
+                  }, isEditing ? "\u4FDD\u5B58" : "\u7F16\u8F91\u5BA2\u6237")
+                ),
+                // Customer edit form
+                isEditing && h("div", {style:{marginTop:8, padding:8, background:"#f9fafb", borderRadius:6}, onClick:(e)=>e.stopPropagation()},
+                  h("input", {style:{width:"100%", padding:"4px 8px", border:"1px solid #d1d5db", borderRadius:4, fontSize:11, marginBottom:6, outline:"none"}, value:customerForm.name, onChange:e=>setCustomerForm({...customerForm, name:e.target.value}), placeholder:"\u5BA2\u6237\u540D\u79F0"}),
+                  h("input", {style:{width:"100%", padding:"4px 8px", border:"1px solid #d1d5db", borderRadius:4, fontSize:11, marginBottom:6, outline:"none"}, value:customerForm.contact, onChange:e=>setCustomerForm({...customerForm, contact:e.target.value}), placeholder:"\u8054\u7CFB\u4EBA"}),
+                  h("input", {style:{width:"100%", padding:"4px 8px", border:"1px solid #d1d5db", borderRadius:4, fontSize:11, marginBottom:6, outline:"none"}, value:customerForm.phone, onChange:e=>setCustomerForm({...customerForm, phone:e.target.value}), placeholder:"\u7535\u8BDD"}),
+                  h("input", {style:{width:"100%", padding:"4px 8px", border:"1px solid #d1d5db", borderRadius:4, fontSize:11, marginBottom:6, outline:"none"}, value:customerForm.email, onChange:e=>setCustomerForm({...customerForm, email:e.target.value}), placeholder:"\u90AE\u7BB1"}),
+                  h("textarea", {style:{width:"100%", padding:"4px 8px", border:"1px solid #d1d5db", borderRadius:4, fontSize:11, outline:"none", resize:"vertical"}, rows:2, value:customerForm.notes, onChange:e=>setCustomerForm({...customerForm, notes:e.target.value}), placeholder:"\u5907\u6CE8"})
+                )
+              );
+            })
+          )
+        ),
+
+        // ── Row 2: Charts (Status Distribution + Weekly Trend) ──
+        h("div", {style:{display:"flex", gap:16, marginBottom:16}},
+          // Task Status Distribution (Donut Chart)
+          h("div", {className:"dashboard-section", style:{flex:"0 0 320px", marginBottom:0}},
+            h("div", {className:"dashboard-section-title"}, "\u4EFB\u52A1\u72B6\u6001\u5206\u5E03"),
+            statusData.length === 0
+              ? h("div", {style:{padding:20, color:"#9ca3af", fontSize:12, textAlign:"center"}}, "\u6682\u65E0\u6570\u636E")
+              : h("div", null,
+                  h(ResponsiveContainer, {width:"100%", height:180},
+                    h(PieChart, null,
+                      h(Pie, {
+                        data: statusData,
+                        cx: "50%",
+                        cy: "50%",
+                        innerRadius: 45,
+                        outerRadius: 70,
+                        paddingAngle: 2,
+                        dataKey: "value"
+                      },
+                        ...statusData.map((entry, i) => h(Cell, {key: i, fill: entry.color}))
+                      ),
+                      h(RTooltip, null)
+                    )
+                  ),
+                  h("div", {style:{display:"flex", flexWrap:"wrap", gap:"8px 16px", justifyContent:"center", marginTop:8}},
+                    ...statusData.map((d, i) =>
+                      h("div", {key:i, style:{display:"flex", alignItems:"center", gap:4, fontSize:11}},
+                        h("span", {style:{width:8, height:8, borderRadius:"50%", background:d.color, flexShrink:0}}),
+                        h("span", {style:{color:"#6b7280"}}, `${d.name} ${d.value}`)
+                      )
+                    )
+                  )
+                )
+          ),
+          // Weekly Completion Trend (Line Chart)
+          h("div", {className:"dashboard-section", style:{flex:1, minWidth:0, marginBottom:0}},
+            h("div", {className:"dashboard-section-title"}, "\u8FD18\u5468\u5B8C\u6210\u8D8B\u52BF"),
+            h(ResponsiveContainer, {width:"100%", height:200},
+              h(LineChart, {data: weeklyData},
+                h(CartesianGrid, {strokeDasharray:"3 3", stroke:"#e5e7eb"}),
+                h(XAxis, {dataKey:"week", tick:{fontSize:11}, stroke:"#9ca3af"}),
+                h(YAxis, {allowDecimals:false, tick:{fontSize:11}, stroke:"#9ca3af"}),
+                h(RTooltip, null),
+                h(Line, {type:"monotone", dataKey:"count", stroke:"#4f46e5", strokeWidth:2, dot:{r:4, fill:"#4f46e5"}, activeDot:{r:6}})
+              )
+            )
+          )
+        ),
+
+        // ── Row 3: Alerts (3 columns) ──
+        h("div", {style:{display:"flex", gap:16, marginBottom:16}},
+          // Overdue tasks
+          h("div", {className:"dashboard-section", style:{flex:1, minWidth:0, marginBottom:0}},
+            h("div", {className:"dashboard-section-title"},
+              h("span", {style:{color:"#ef4444"}}, "\u26A0 \u8D85\u671F\u4EFB\u52A1"),
+              h("span", {style:{fontSize:12, fontWeight:400, color:"#9ca3af"}}, ` ${overdueTasks.length}`)
+            ),
+            overdueTasks.length === 0
+              ? h("div", {style:{padding:12, color:"#9ca3af", fontSize:12, textAlign:"center"}}, "\u65E0\u8D85\u671F\u4EFB\u52A1")
+              : overdueTasks.slice(0,8).map((t,i) => {
+                  const proj = PROJECTS.find(p=>p.id===t.projectId);
+                  const daysOver = Math.round((todayD - parseDate(t.end)) / 864e5);
+                  return h("div", {key:t.id, className:"dash-alert-item", onClick:()=>goToTask(t)},
+                    h("span", {style:{width:8, height:8, borderRadius:"50%", background:proj?proj.color:"#999", flexShrink:0}}),
+                    h("span", {style:{flex:1, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}, t.name),
+                    h("span", {style:{color:"#ef4444", fontWeight:600, whiteSpace:"nowrap", fontSize:11}}, `${daysOver}\u5929`)
+                  );
+                })
+          ),
+          // Upcoming tasks
+          h("div", {className:"dashboard-section", style:{flex:1, minWidth:0, marginBottom:0}},
+            h("div", {className:"dashboard-section-title"},
+              h("span", {style:{color:"#f59e0b"}}, "\u23F0 7\u5929\u5185\u5230\u671F"),
+              h("span", {style:{fontSize:12, fontWeight:400, color:"#9ca3af"}}, ` ${upcomingTasks.length}`)
+            ),
+            upcomingTasks.length === 0
+              ? h("div", {style:{padding:12, color:"#9ca3af", fontSize:12, textAlign:"center"}}, "\u65E0\u5373\u5C06\u5230\u671F\u4EFB\u52A1")
+              : upcomingTasks.slice(0,8).map((t,i) => {
+                  const proj = PROJECTS.find(p=>p.id===t.projectId);
+                  const daysLeft = Math.round((parseDate(t.end) - todayD) / 864e5);
+                  return h("div", {key:t.id, className:"dash-alert-item", onClick:()=>goToTask(t)},
+                    h("span", {style:{width:8, height:8, borderRadius:"50%", background:proj?proj.color:"#999", flexShrink:0}}),
+                    h("span", {style:{flex:1, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}, t.name),
+                    h("span", {style:{color:daysLeft===0?"#ef4444":"#f59e0b", fontWeight:600, whiteSpace:"nowrap", fontSize:11}}, daysLeft===0?"\u4ECA\u5929":`${daysLeft}\u5929`)
+                  );
+                })
+          ),
+          // Recently completed
+          h("div", {className:"dashboard-section", style:{flex:1, minWidth:0, marginBottom:0}},
+            h("div", {className:"dashboard-section-title"},
+              h("span", {style:{color:"#10b981"}}, "\u2714 \u8FD1\u671F\u5B8C\u6210"),
+              h("span", {style:{fontSize:12, fontWeight:400, color:"#9ca3af"}}, ` ${recentDone.length}`)
+            ),
+            recentDone.length === 0
+              ? h("div", {style:{padding:12, color:"#9ca3af", fontSize:12, textAlign:"center"}}, "\u8FD17\u5929\u65E0\u5B8C\u6210\u4EFB\u52A1")
+              : recentDone.slice(0,8).map((t,i) => {
+                  const proj = PROJECTS.find(p=>p.id===t.projectId);
+                  return h("div", {key:t.id, className:"dash-alert-item", onClick:()=>goToTask(t)},
+                    h("span", {style:{width:8, height:8, borderRadius:"50%", background:proj?proj.color:"#999", flexShrink:0}}),
+                    h("span", {style:{flex:1, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}, t.name),
+                    h("span", {style:{color:"#10b981", fontSize:11, whiteSpace:"nowrap"}}, fmtShort(t.end))
+                  );
+                })
+          )
+        ),
+
+        // ── Row 4: Stats (left) + Phase Progress (right) ──
+        h("div", {style:{display:"flex", gap:16, marginBottom:16}},
+          h("div", {style:{flex:"0 0 280px"}},
+            h("div", {style:{display:"flex", gap:12, flexWrap:"wrap"}},
+              h("div", {style:{background:"#fff", borderRadius:8, padding:"10px 16px", border:"1px solid #e5e7eb"}},
+                h("div", {style:{fontSize:11, color:"#6b7280"}}, "\u603B\u4EFB\u52A1"),
+                h("div", {style:{fontSize:18, fontWeight:700}}, allTasks.length)
+              ),
+              h("div", {style:{background:"#fff", borderRadius:8, padding:"10px 16px", border:"1px solid #e5e7eb"}},
+                h("div", {style:{fontSize:11, color:"#6b7280"}}, "\u603B\u5DE5\u65F6"),
+                h("div", {style:{fontSize:18, fontWeight:700}}, fmtHours(totalHrs))
+              ),
+              h("div", {style:{background:"#fff", borderRadius:8, padding:"10px 16px", border:"1px solid #e5e7eb"}},
+                h("div", {style:{fontSize:11, color:"#6b7280"}}, "\u6210\u5458"),
+                h("div", {style:{fontSize:18, fontWeight:700}}, allMembers.size)
+              )
+            )
+          ),
+          h("div", {className:"dashboard-section", style:{flex:1, minWidth:0, marginBottom:0}},
+            h("div", {className:"dashboard-section-title"},
+              h("span", null, "\u9636\u6BB5\u8FDB\u5EA6"),
+              selProj && h("span", {style:{fontSize:12, fontWeight:400, color:"#9ca3af", marginLeft:8}}, selProj.name)
+            ),
+            selPhases.length === 0
+              ? h("div", {style:{padding:12, color:"#9ca3af", fontSize:12, textAlign:"center"}}, "\u6682\u65E0\u9636\u6BB5")
+              : selPhases.map((ph,i) => {
+                  const tasks = TASKS.filter(t => t.phaseId === ph.id);
+                  const done = tasks.filter(t => t.done).length;
+                  const total = tasks.length;
+                  const prog = total ? Math.round(done/total*100) : 0;
+                  return h("div", {key:ph.id, className:"dash-phase-item"},
+                    h("div", {style:{position:"relative", width:40, height:40, flexShrink:0}},
+                      h("svg", {width:40, height:40, viewBox:"0 0 40 40"},
+                        h("circle", {cx:20, cy:20, r:16, fill:"none", stroke:"#e5e7eb", strokeWidth:4}),
+                        h("circle", {cx:20, cy:20, r:16, fill:"none", stroke:ph.color, strokeWidth:4,
+                          strokeDasharray:`${prog*1.005} ${100.5-prog*1.005}`,
+                          strokeLinecap:"round", transform:"rotate(-90 20 20)"})
+                      ),
+                      h("span", {style:{position:"absolute", top:"50%", left:"50%", transform:"translate(-50%,-50%)", fontSize:10, fontWeight:700, color:"#374151"}}, `${prog}%`)
+                    ),
+                    h("div", {style:{flex:1}},
+                      h("div", {style:{fontSize:12, fontWeight:600, color:"#374151", marginBottom:2}}, ph.name),
+                      h("div", {style:{fontSize:11, color:"#9ca3af"}}, `${done}/${total} \u4EFB\u52A1`)
+                    )
+                  );
+                })
+          )
+        ),
+
+        // ── Row 5: Project Review Results ──
+        h("div", {ref:reviewRef, className:"dashboard-section"},
+          h("div", {className:"dashboard-section-title"}, "\u9879\u76EE\u590D\u76D8\u7ED3\u679C"),
+          PROJECTS.map(p => {
+            const review = PROJECT_REVIEWS.find(r => r.projectId === p.id);
+            const isEditing = editingReviewId === p.id;
+            return h("div", {key:p.id, style:{marginBottom:12, paddingBottom:12, borderBottom:"1px solid #f0f0f0"}},
+              h("div", {style:{display:"flex", alignItems:"center", gap:8, marginBottom:6}},
+                h("span", {style:{width:8, height:8, borderRadius:"50%", background:p.color, flexShrink:0}}),
+                h("span", {style:{fontSize:13, fontWeight:600}}, p.name),
+                h("button", {
+                  style:{marginLeft:"auto", padding:"2px 10px", borderRadius:4, border:"1px solid #d1d5db", background:"#fff", fontSize:11, cursor:"pointer"},
+                  onClick: () => {
+                    if (isEditing) {
+                      setEditingReviewId(null);
+                    } else {
+                      setEditingReviewId(p.id);
+                      setEditingReviewText(review ? review.content : "");
+                    }
+                  }
+                }, isEditing ? "\u5B8C\u6210" : "\u7F16\u8F91")
+              ),
+              isEditing
+                ? h("textarea", {
+                    value: editingReviewText,
+                    onChange: e => setEditingReviewText(e.target.value),
+                    onBlur: () => {
+                      const idx = PROJECT_REVIEWS.findIndex(r => r.projectId === p.id);
+                      if (editingReviewText.trim()) {
+                        if (idx !== -1) PROJECT_REVIEWS[idx].content = editingReviewText.trim();
+                        else PROJECT_REVIEWS.push({projectId: p.id, content: editingReviewText.trim()});
+                      } else if (idx !== -1) {
+                        PROJECT_REVIEWS.splice(idx, 1);
+                      }
+                      setEditingReviewId(null);
+                      autoSave();
+                    },
+                    onKeyDown: e => { if (e.key === "Escape") { setEditingReviewId(null); } if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.target.blur(); } },
+                    autoFocus: true,
+                    rows: 3,
+                    style: {width:"100%", padding:"6px 8px", border:"1px solid #d1d5db", borderRadius:4, fontSize:12, fontFamily:"inherit", resize:"vertical", outline:"none"}
+                  })
+                : h("div", {style:{fontSize:12, color: review ? "#374151" : "#9ca3af", lineHeight:1.6, whiteSpace:"pre-wrap", minHeight:20, cursor:"text"}, onClick: () => { setEditingReviewId(p.id); setEditingReviewText(review ? review.content : ""); }},
+                    review ? review.content : "\u70B9\u51FB\u6DFB\u52A0\u590D\u76D8\u5185\u5BB9...")
+            );
+          })
+        )
+      );
+    }
+
+    function WorkloadView({ selectedProject }) {
+      const sd="2025-09-01",weeks=13;
+      const dl=["周一","周二","周三","周四","周五","周六","周日"];
+      const filteredTasks = TASKS.filter(t => t.projectId === selectedProject);
+      const getDayTasks = (ds) => { const td=parseDate(ds); return filteredTasks.filter(t=>{const ts=parseDate(t.start),te=parseDate(t.end);return td>=ts&&td<=te;}); };
+      const getCount = (ds) => getDayTasks(ds).length;
+      const getColor = (c) => { if(c===0)return"#f3f0f4";const i=Math.min(c/4,1);return `rgb(${Math.round(244-i*60)},${Math.round(180-i*140)},${Math.round(220-i*80)})`; };
+      const ml=["2025/09","2025/10","2025/11","2025/12"];
+      const gd=[]; for(let w=0;w<weeks;w++){const ws2=addDays(sd,w*7);gd.push(Array.from({length:7},(_,d)=>({date:addDays(ws2,d),count:getCount(addDays(ws2,d))})));}
+      const [hc, setHc] = useState(null);
+      return h("div", {className:"workload-container"},
+        h("div", {className:"dashboard-section"},
+          h("div", {className:"dashboard-section-title"}, "Workload Analysis"),
+          h("div", {style:{display:"flex",gap:24}},
+            h("div", {className:"workload-labels"}, ...dl.map(d=>h("div", {key:d, className:"workload-label"}, d))),
+            h("div", null,
+              h("div", {className:"workload-grid"},
+                ...gd.map((wk,wi)=>h("div", {key:wi, className:"workload-month-row", style:{flexDirection:"column",gap:4}},
+                  ...wk.map((cell,di)=>{const dayTasks=getDayTasks(cell.date); return h("div", {key:di, className:"workload-cell", style:{background:getColor(cell.count)}, onMouseEnter:e=>{const r=e.target.getBoundingClientRect();setHc({x:r.right+8,y:r.top,date:cell.date,count:cell.count,tasks:dayTasks});}, onMouseLeave:()=>setHc(null)});})
+                ))
+              ),
+              h("div", {style:{display:"flex",gap:4,marginTop:8}}, ...gd.filter((_,i)=>i%4===0).map((_,i)=>h("div", {key:i, className:"workload-month-label", style:{width:80}}, ml[i]||"")))
+            )
+          )
+        ),
+        hc && h("div", {className:"tooltip-box", style:{left:hc.x,top:hc.y, minWidth:160, whiteSpace:"normal"}},
+          h("div", {style:{fontWeight:600, marginBottom:4}}, `${hc.date} - ${hc.count} \u6761\u4EFB\u52A1`),
+          hc.tasks.length > 0 && hc.tasks.map((t,i) => {
+            const proj = PROJECTS.find(p=>p.id===t.projectId);
+            return h("div", {key:i, style:{fontSize:11, padding:"2px 0", display:"flex", alignItems:"center", gap:4}},
+              h("span", {style:{width:6, height:6, borderRadius:"50%", background:proj?proj.color:"#999", flexShrink:0}}),
+              h("span", null, t.name)
+            );
+          })
+        ),
+        h("div", {style:{display:"flex",alignItems:"center",gap:6,marginTop:16,fontSize:12,color:"#6b7280"}},
+          h("span", null, "Less"),
+          ...[0,1,2,3,4].map(n=>h("div", {key:n, className:"workload-cell", style:{background:getColor(n),width:16,height:16}})),
+          h("span", null, "More")
+        )
+      );
+    }
+
+    function TabBar() {
+      const [tabs, setTabs] = useState(openTabs);
+      const [activeId, setActiveId] = useState(activeTabId);
+      
+      useEffect(() => {
+        onTabChange(() => {
+          setTabs([...openTabs]);
+          setActiveId(activeTabId);
+        });
+      }, []);
+      
+      return h("div", {className:"file-tabs-bar"},
+        ...tabs.map(tab => 
+          h("div", {
+            key: tab.id,
+            className: `file-tab ${tab.id === activeId ? 'active' : ''}`,
+            onClick: () => switchTab(tab.id)
+          },
+            h("span", {className: tab.dirty ? "tab-dirty" : "tab-saved"}),
+            h("span", {className:"tab-name"}, tab.name),
+            h("button", {
+              className:"tab-close",
+              onClick: (e) => { e.stopPropagation(); closeTab(tab.id); },
+              title:"关闭"
+            }, "×")
+          )
+        )
+      );
+    }
+
+    function App() {
+      const [view, setView] = useState("gantt");
+      const [selectedProject, setSelectedProject] = useState(1);
+      const [appRenderKey, setAppRenderKey] = useState(0);
+      const triggerAppRender = () => setAppRenderKey(k => k + 1);
+      useEffect(() => { onGlobalRender(triggerAppRender); }, []);
+      useEffect(() => {
+        const handler = (e) => { if((e.ctrlKey||e.metaKey) && e.key==='s') { e.preventDefault(); saveData(); } };
+        document.addEventListener('keydown', handler);
+        return () => document.removeEventListener('keydown', handler);
+      }, []);
+
+      const handleRenameProject = (projId, newName) => {
+        const p = PROJECTS.find(x => x.id === projId);
+        if(p) { p.name = newName; autoSave(); triggerAppRender(); }
+      };
+      const handleDeleteProject = (projId) => {
+        const idx = PROJECTS.findIndex(p => p.id === projId);
+        if(idx === -1 || PROJECTS.length <= 1) return;
+        PROJECTS.splice(idx, 1);
+        // Remove associated tasks and phases
+        for(let i = TASKS.length - 1; i >= 0; i--) { if(TASKS[i].projectId === projId) TASKS.splice(i, 1); }
+        for(let i = PHASES.length - 1; i >= 0; i--) { if(PHASES[i].projectId === projId) PHASES.splice(i, 1); }
+        autoSave();
+        if(selectedProject === projId) { setSelectedProject(PROJECTS[0].id); }
+        triggerAppRender();
+      };
+      const handleBatchDeleteProjects = (projIds) => {
+        // Keep at least one project
+        const toDelete = projIds.filter(id => PROJECTS.length - projIds.filter(d=>d===id).length >= 1 || PROJECTS.length > projIds.length);
+        if(PROJECTS.length - toDelete.length < 1) {
+          // Can't delete all projects, keep the first one
+          toDelete.splice(toDelete.indexOf(PROJECTS[0].id), 1);
+        }
+        for(const projId of toDelete) {
+          const idx = PROJECTS.findIndex(p => p.id === projId);
+          if(idx !== -1) PROJECTS.splice(idx, 1);
+          for(let i = TASKS.length - 1; i >= 0; i--) { if(TASKS[i].projectId === projId) TASKS.splice(i, 1); }
+          for(let i = PHASES.length - 1; i >= 0; i--) { if(PHASES[i].projectId === projId) PHASES.splice(i, 1); }
+        }
+        autoSave();
+        if(toDelete.includes(selectedProject)) { setSelectedProject(PROJECTS[0]?.id || 1); }
+        triggerAppRender();
+      };
+
+      return h("div", {className:"app", key:appRenderKey},
+        h(TopBar, {view, setView, selectedProject, onSelectProject:setSelectedProject, onRenameProject:handleRenameProject, onDeleteProject:handleDeleteProject, onBatchDeleteProjects:handleBatchDeleteProjects}),
+        h(TabBar, null),
+        h("div", {style:{display:"flex", flex:1, minHeight:0, overflow:"hidden"}},
+          view==="gantt" && h(GanttView, {selectedProject}),
+          view==="calendar" && h(CalendarView, {selectedProject}),
+          view==="dashboard" && h(DashboardView, {selectedProject, setView, setSelectedProject}),
+          view==="workload" && h(WorkloadView, {selectedProject})
+        )
+      );
+    }
+
+    // ─── Mount ──────────────────────────────────────────────────────────────────
+    (async () => {
+      try {
+        await loadData();
+        const root = document.getElementById("root");
+        root.textContent = "";
+        createRoot(root).render(h(App));
+        window.__ganttable_ok = true;
+      } catch(e) {
+        document.getElementById("root").textContent = "Error: " + e.message;
+        window.__ganttable_err = e.message;
+      }
+    })();
+  </script>
+</body>
+</html>
