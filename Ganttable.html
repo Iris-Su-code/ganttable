@@ -334,6 +334,31 @@
     const PROJECT_REVIEWS = [];
     const TODAY = new Date().toISOString().slice(0,10);
 
+    // ── GitHub Data Sync ──────────────────────────────────────────────────────
+    const GITHUB_DATA_URL = "https://raw.githubusercontent.com/Iris-Su-code/ganttable/main/data.json";
+    const GITHUB_CACHE_KEY = "ganttable_github_cache";
+    const GITHUB_CACHE_TIME_KEY = "ganttable_github_cache_time";
+    const CACHE_EXPIRY_MS = 5 * 60 * 1000;
+
+    const fetchGitHubData = async () => {
+      try {
+        const cached = localStorage.getItem(GITHUB_CACHE_KEY);
+        const cacheTime = parseInt(localStorage.getItem(GITHUB_CACHE_TIME_KEY) || "0");
+        if (cached && Date.now() - cacheTime < CACHE_EXPIRY_MS) {
+          return JSON.parse(cached);
+        }
+        const resp = await fetch(GITHUB_DATA_URL + "?t=" + Date.now());
+        if (!resp.ok) throw new Error("HTTP " + resp.status);
+        const data = await resp.json();
+        localStorage.setItem(GITHUB_CACHE_KEY, JSON.stringify(data));
+        localStorage.setItem(GITHUB_CACHE_TIME_KEY, String(Date.now()));
+        return data;
+      } catch(e) {
+        const cached = localStorage.getItem(GITHUB_CACHE_KEY);
+        return cached ? JSON.parse(cached) : null;
+      }
+    };
+
     // ── Multi-Tab File System ─────────────────────────────────────────────────
     const STORAGE_KEY = "ganttable_data";
     const DB_NAME = "GanttableDB";
@@ -463,6 +488,33 @@
     const loadData = async () => {
       if(dataLoaded) return; // Prevent multiple calls
       dataLoaded = true;
+      
+      // Try GitHub data sync first
+      const githubData = await fetchGitHubData();
+      if(githubData) {
+        TASKS.length = 0;
+        PHASES.length = 0;
+        PROJECTS.length = 0;
+        PROJECT_REVIEWS.length = 0;
+        if(githubData.tasks) TASKS.push(...githubData.tasks);
+        if(githubData.phases) PHASES.push(...githubData.phases);
+        if(githubData.projects) PROJECTS.push(...githubData.projects);
+        if(githubData.reviews) PROJECT_REVIEWS.push(...githubData.reviews);
+        
+        const tab = {
+          id: nextTabId++,
+          name: "GitHub Data",
+          handle: null,
+          dirty: false,
+          data: getCurrentData()
+        };
+        openTabs.push(tab);
+        activeTabId = tab.id;
+        notifyTabChange();
+        triggerGlobalRender();
+        console.log("Loaded data from GitHub");
+        return;
+      }
       
       // Try to restore previously opened file from IndexedDB (only if permission already granted)
       const savedHandle = await loadHandleFromDB();
