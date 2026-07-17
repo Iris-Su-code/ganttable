@@ -347,7 +347,11 @@
         if (cached && Date.now() - cacheTime < CACHE_EXPIRY_MS) {
           return JSON.parse(cached);
         }
-        const resp = await fetch(GITHUB_DATA_URL + "?t=" + Date.now());
+        // Add 5-second timeout to prevent hanging
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000);
+        const resp = await fetch(GITHUB_DATA_URL + "?t=" + Date.now(), { signal: controller.signal });
+        clearTimeout(timeoutId);
         if (!resp.ok) throw new Error("HTTP " + resp.status);
         const data = await resp.json();
         localStorage.setItem(GITHUB_CACHE_KEY, JSON.stringify(data));
@@ -486,108 +490,100 @@
     const getFileData = () => JSON.stringify({tasks:TASKS, phases:PHASES, projects:PROJECTS}, null, 2);
 
     const loadData = async () => {
-      if(dataLoaded) return; // Prevent multiple calls
+      if(dataLoaded) return;
       dataLoaded = true;
-      
-      // Try GitHub data sync first
-      const githubData = await fetchGitHubData();
-      if(githubData) {
-        TASKS.length = 0;
-        PHASES.length = 0;
-        PROJECTS.length = 0;
-        PROJECT_REVIEWS.length = 0;
-        if(githubData.tasks) TASKS.push(...githubData.tasks);
-        if(githubData.phases) PHASES.push(...githubData.phases);
-        if(githubData.projects) PROJECTS.push(...githubData.projects);
-        if(githubData.reviews) PROJECT_REVIEWS.push(...githubData.reviews);
-        
-        const tab = {
-          id: nextTabId++,
-          name: "GitHub Data",
-          handle: null,
-          dirty: false,
-          data: getCurrentData()
-        };
+
+      // Show choice dialog
+      const choice = await new Promise(resolve => {
+        const overlay = document.createElement("div");
+        overlay.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;z-index:99999";
+        const dialog = document.createElement("div");
+        dialog.style.cssText = "background:#fff;border-radius:16px;padding:32px 40px;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,0.15);max-width:360px";
+        dialog.innerHTML = `
+          <div style="font-size:16px;font-weight:600;color:#374151;margin-bottom:8px">选择数据来源</div>
+          <div style="font-size:13px;color:#6b7280;margin-bottom:24px">从哪里加载项目数据？</div>
+          <div style="display:flex;gap:12px;justify-content:center">
+            <button id="dlg-local" style="padding:10px 24px;border-radius:8px;border:1px solid #e5e7eb;background:#fff;cursor:pointer;font-size:14px;color:#374151">本地文件</button>
+            <button id="dlg-github" style="padding:10px 24px;border-radius:8px;border:none;background:#4f46e5;color:#fff;cursor:pointer;font-size:14px">GitHub</button>
+          </div>
+        `;
+        overlay.appendChild(dialog);
+        document.body.appendChild(overlay);
+
+        document.getElementById("dlg-local").onclick = () => { document.body.removeChild(overlay); resolve("local"); };
+        document.getElementById("dlg-github").onclick = () => { document.body.removeChild(overlay); resolve("github"); };
+      });
+
+      const loadLocalData = (d, tabName, handle) => {
+        TASKS.length = 0; PHASES.length = 0; PROJECTS.length = 0; PROJECT_REVIEWS.length = 0;
+        if(d.tasks) TASKS.push(...d.tasks);
+        if(d.phases) PHASES.push(...d.phases);
+        if(d.projects) {
+          const seen = new Set();
+          for(const p of d.projects) { if(!seen.has(p.id)) { seen.add(p.id); PROJECTS.push(p); } }
+        }
+        if(d.reviews) PROJECT_REVIEWS.push(...d.reviews);
+        const tab = { id: nextTabId++, name: tabName, handle: handle || null, dirty: false, data: getCurrentData() };
         openTabs.push(tab);
         activeTabId = tab.id;
         notifyTabChange();
         triggerGlobalRender();
-        console.log("Loaded data from GitHub");
-        return;
-      }
-      
-      // Try to restore previously opened file from IndexedDB (only if permission already granted)
-      const savedHandle = await loadHandleFromDB();
-      if(savedHandle) {
+      };
+
+      if(choice === "local") {
+        // Try localStorage first
         try {
-          const perm = await savedHandle.queryPermission({mode:"read"});
-          if(perm === "granted") {
-            const file = await savedHandle.getFile();
-            const text = await file.text();
-            const d = JSON.parse(text);
-            TASKS.length = 0;
-            PHASES.length = 0;
-            PROJECTS.length = 0;
-            PROJECT_REVIEWS.length = 0;
-            if(d.tasks) TASKS.push(...d.tasks);
-            if(d.phases) PHASES.push(...d.phases);
-            if(d.projects) PROJECTS.push(...d.projects);
-            if(d.reviews) PROJECT_REVIEWS.push(...d.reviews);
-            
-            const tab = {
-              id: nextTabId++,
-              name: file.name,
-              handle: savedHandle,
-              dirty: false,
-              data: getCurrentData()
-            };
-            openTabs.push(tab);
-            activeTabId = tab.id;
-            notifyTabChange();
-            triggerGlobalRender();
-            return;
-          } else {
-            // Permission not granted, clear saved handle
-            await clearHandleFromDB();
-          }
-        } catch(e) {
-          console.warn("Failed to restore file:", e);
-          await clearHandleFromDB();
-        }
-      }
-      
-      // Fallback: Load from localStorage into a default tab
-      try {
-        const raw = localStorage.getItem(STORAGE_KEY);
-        if(raw) {
-          const d = JSON.parse(raw);
-          TASKS.length = 0;
-          PHASES.length = 0;
-          PROJECTS.length = 0;
-          if(d.tasks) TASKS.push(...d.tasks);
-          if(d.phases) PHASES.push(...d.phases);
-          if(d.projects) {
-            const seen = new Set();
-            for(const p of d.projects) {
-              if(!seen.has(p.name)) {
-                seen.add(p.name);
-                PROJECTS.push(p);
-              }
+          const raw = localStorage.getItem(STORAGE_KEY);
+          if(raw) {
+            const d = JSON.parse(raw);
+            if(d.tasks && d.tasks.length > 0) {
+              loadLocalData(d, "本地数据", null);
+              console.log("Loaded from local storage");
+              return;
             }
           }
+        } catch(e) {}
+
+        // Try IndexedDB
+        const savedHandle = await loadHandleFromDB();
+        if(savedHandle) {
+          try {
+            const perm = await savedHandle.queryPermission({mode:"read"});
+            if(perm === "granted") {
+              const file = await savedHandle.getFile();
+              const text = await file.text();
+              const d = JSON.parse(text);
+              loadLocalData(d, file.name, savedHandle);
+              console.log("Loaded from IndexedDB file");
+              return;
+            } else {
+              await clearHandleFromDB();
+            }
+          } catch(e) {
+            console.warn("Failed to restore file:", e);
+            await clearHandleFromDB();
+          }
         }
-      } catch(e){}
-      
-      const defaultTab = {
-        id: nextTabId++,
-        name: "本地数据",
-        handle: null,
-        dirty: false,
-        data: getCurrentData()
-      };
-      openTabs.push(defaultTab);
-      activeTabId = defaultTab.id;
-      notifyTabChange();
+
+        // Fallback: empty data
+        const defaultTab = { id: nextTabId++, name: "本地数据", handle: null, dirty: false, data: getCurrentData() };
+        openTabs.push(defaultTab);
+        activeTabId = defaultTab.id;
+        notifyTabChange();
+      } else {
+        // GitHub
+        const githubData = await fetchGitHubData();
+        if(githubData && githubData.tasks && githubData.tasks.length > 0) {
+          loadLocalData(githubData, "GitHub Data", null);
+          console.log("Loaded data from GitHub");
+          return;
+        }
+        // Fallback: empty data
+        const defaultTab = { id: nextTabId++, name: "本地数据", handle: null, dirty: false, data: getCurrentData() };
+        openTabs.push(defaultTab);
+        activeTabId = defaultTab.id;
+        notifyTabChange();
+      }
     };
 
     const switchTab = (tabId) => {
@@ -2693,45 +2689,137 @@
       );
     }
 
-    function WorkloadView({ selectedProject }) {
-      const sd="2025-09-01",weeks=13;
+    // Single project heatmap with its own date controls
+    function ProjectHeatmap({ project }) {
       const dl=["周一","周二","周三","周四","周五","周六","周日"];
-      const filteredTasks = TASKS.filter(t => t.projectId === selectedProject);
-      const getDayTasks = (ds) => { const td=parseDate(ds); return filteredTasks.filter(t=>{const ts=parseDate(t.start),te=parseDate(t.end);return td>=ts&&td<=te;}); };
-      const getCount = (ds) => getDayTasks(ds).length;
-      const getColor = (c) => { if(c===0)return"#f3f0f4";const i=Math.min(c/4,1);return `rgb(${Math.round(244-i*60)},${Math.round(180-i*140)},${Math.round(220-i*80)})`; };
-      const ml=["2025/09","2025/10","2025/11","2025/12"];
-      const gd=[]; for(let w=0;w<weeks;w++){const ws2=addDays(sd,w*7);gd.push(Array.from({length:7},(_,d)=>({date:addDays(ws2,d),count:getCount(addDays(ws2,d))})));}
-      const [hc, setHc] = useState(null);
-      return h("div", {className:"workload-container"},
-        h("div", {className:"dashboard-section"},
-          h("div", {className:"dashboard-section-title"}, "Workload Analysis"),
-          h("div", {style:{display:"flex",gap:24}},
-            h("div", {className:"workload-labels"}, ...dl.map(d=>h("div", {key:d, className:"workload-label"}, d))),
-            h("div", null,
-              h("div", {className:"workload-grid"},
-                ...gd.map((wk,wi)=>h("div", {key:wi, className:"workload-month-row", style:{flexDirection:"column",gap:4}},
-                  ...wk.map((cell,di)=>{const dayTasks=getDayTasks(cell.date); return h("div", {key:di, className:"workload-cell", style:{background:getColor(cell.count)}, onMouseEnter:e=>{const r=e.target.getBoundingClientRect();setHc({x:r.right+8,y:r.top,date:cell.date,count:cell.count,tasks:dayTasks});}, onMouseLeave:()=>setHc(null)});})
-                ))
-              ),
-              h("div", {style:{display:"flex",gap:4,marginTop:8}}, ...gd.filter((_,i)=>i%4===0).map((_,i)=>h("div", {key:i, className:"workload-month-label", style:{width:80}}, ml[i]||"")))
+      const pinkColors = ["#f3f0f4","#f5d0e8","#e8a0d0","#d470b8","#c040a0","#a82088"];
+
+      const autoStart = useMemo(() => {
+        const pTasks = TASKS.filter(t=>t.projectId===project.id);
+        if (pTasks.length === 0) return new Date().toISOString().slice(0,10);
+        const minDate = pTasks.reduce((min, t) => t.start < min ? t.start : min, pTasks[0].start);
+        const d = new Date(minDate);
+        const day = d.getDay();
+        const diff = day === 0 ? 6 : day - 1;
+        d.setDate(d.getDate() - diff);
+        return d.toISOString().slice(0,10);
+      }, [project.id]);
+
+      const [startDate, setStartDate] = useState(autoStart);
+      const [weekCount, setWeekCount] = useState(13);
+      const [tooltip, setTooltip] = useState(null);
+
+      const getDayTasks = (dateStr) => {
+        const td = parseDate(dateStr);
+        return TASKS.filter(t => {
+          if (t.projectId !== project.id) return false;
+          const ts = parseDate(t.start), te = parseDate(t.end);
+          return td >= ts && td <= te;
+        });
+      };
+
+      const monthLabels = useMemo(() => {
+        const labels = [];
+        const d = new Date(startDate);
+        let lastMonth = -1;
+        for (let w = 0; w < weekCount; w++) {
+          const ws = new Date(d);
+          ws.setDate(ws.getDate() + w * 7);
+          const mk = ws.getFullYear() * 12 + ws.getMonth();
+          if (mk !== lastMonth) {
+            labels.push({ week: w, label: `${ws.getFullYear()}/${String(ws.getMonth()+1).padStart(2,'0')}` });
+            lastMonth = mk;
+          }
+        }
+        return labels;
+      }, [startDate, weekCount]);
+
+      const getCellBg = (count) => {
+        if (count === 0) return pinkColors[0];
+        const idx = Math.min(count, pinkColors.length - 1);
+        return pinkColors[idx];
+      };
+
+      const grid = useMemo(() => {
+        const g = [];
+        for (let w = 0; w < weekCount; w++) {
+          const ws = addDays(startDate, w * 7);
+          const week = [];
+          for (let d = 0; d < 7; d++) {
+            const dt = addDays(ws, d);
+            const tasks = getDayTasks(dt);
+            week.push({ date: dt, count: tasks.length, tasks });
+          }
+          g.push(week);
+        }
+        return g;
+      }, [startDate, weekCount, project.id]);
+
+      const taskCount = TASKS.filter(t=>t.projectId===project.id).length;
+
+      return h("div", {style:{background:"#fff",borderRadius:12,padding:16,boxShadow:"0 1px 4px rgba(0,0,0,0.06)",minWidth:380,flex:"1 1 380px",maxWidth:"100%"}},
+        // Header
+        h("div", {style:{display:"flex",alignItems:"center",gap:8,marginBottom:10}},
+          h("div", {style:{width:12,height:12,borderRadius:3,background:project.color}}),
+          h("span", {style:{fontSize:14,fontWeight:600,color:"#374151"}}, project.name),
+          h("span", {style:{fontSize:11,color:"#9ca3af"}}, `(${taskCount} 条任务)`)
+        ),
+        // Date controls
+        h("div", {style:{display:"flex",gap:12,alignItems:"center",marginBottom:10,flexWrap:"wrap"}},
+          h("div", {style:{display:"flex",alignItems:"center",gap:6}},
+            h("label", {style:{fontSize:12,color:"#6b7280"}}, "开始"),
+            h("input", {type:"date", value:startDate, onChange:e=>setStartDate(e.target.value), style:{padding:"3px 6px",border:"1px solid #d1d5db",borderRadius:4,fontSize:12,outline:"none"}})
+          ),
+          h("div", {style:{display:"flex",alignItems:"center",gap:6}},
+            h("label", {style:{fontSize:12,color:"#6b7280"}}, "周数"),
+            h("select", {value:weekCount, onChange:e=>setWeekCount(parseInt(e.target.value)), style:{padding:"3px 6px",border:"1px solid #d1d5db",borderRadius:4,fontSize:12,outline:"none"}},
+              [4,8,13,26,52].map(n => h("option", {key:n, value:n}, n + "周"))
             )
           )
         ),
-        hc && h("div", {className:"tooltip-box", style:{left:hc.x,top:hc.y, minWidth:160, whiteSpace:"normal"}},
-          h("div", {style:{fontWeight:600, marginBottom:4}}, `${hc.date} - ${hc.count} \u6761\u4EFB\u52A1`),
-          hc.tasks.length > 0 && hc.tasks.map((t,i) => {
-            const proj = PROJECTS.find(p=>p.id===t.projectId);
-            return h("div", {key:i, style:{fontSize:11, padding:"2px 0", display:"flex", alignItems:"center", gap:4}},
-              h("span", {style:{width:6, height:6, borderRadius:"50%", background:proj?proj.color:"#999", flexShrink:0}}),
-              h("span", null, t.name)
-            );
-          })
+        // Heatmap grid
+        h("div", {style:{display:"flex",gap:24}},
+          h("div", {className:"workload-labels"}, ...dl.map(d=>h("div", {key:d, className:"workload-label"}, d))),
+          h("div", {style:{flex:1,minWidth:0}},
+            h("div", {className:"workload-grid"},
+              ...grid.map((wk,wi)=>h("div", {key:wi, className:"workload-month-row", style:{flexDirection:"column",gap:4}},
+                ...wk.map((cell,di)=>
+                  h("div", {key:di, className:"workload-cell",
+                    style:{background:getCellBg(cell.count), cursor: cell.count > 0 ? "pointer" : "default"},
+                    onMouseEnter:e=>{
+                      if(cell.count===0) return;
+                      const r=e.target.getBoundingClientRect();
+                      setTooltip({x:r.right+8, y:r.top, date:cell.date, count:cell.count, tasks:cell.tasks});
+                    },
+                    onMouseLeave:()=>setTooltip(null)
+                  })
+                )
+              )),
+            ),
+            h("div", {style:{display:"flex",gap:4,marginTop:4}},
+              ...monthLabels.map((ml, i) => h("div", {key:i, className:"workload-month-label", style:{width:80, marginLeft: ml.week === 0 ? 0 : (ml.week - (monthLabels[i-1]?.week || 0)) * 20 - 80}}, ml.label))
+            )
+          )
         ),
-        h("div", {style:{display:"flex",alignItems:"center",gap:6,marginTop:16,fontSize:12,color:"#6b7280"}},
-          h("span", null, "Less"),
-          ...[0,1,2,3,4].map(n=>h("div", {key:n, className:"workload-cell", style:{background:getColor(n),width:16,height:16}})),
-          h("span", null, "More")
+        // Tooltip
+        tooltip && h("div", {className:"tooltip-box", style:{position:"fixed",left:tooltip.x,top:tooltip.y, minWidth:160, whiteSpace:"normal", maxHeight:200, overflowY:"auto",zIndex:9999}},
+          h("div", {style:{fontWeight:600,marginBottom:4,fontSize:12}}, `${tooltip.date} - ${tooltip.count} 条任务`),
+          tooltip.tasks.map((t,i) => h("div", {key:i, style:{fontSize:11,padding:"1px 0"}}, t.name))
+        )
+      );
+    }
+
+    function WorkloadView() {
+      const projectsWithTasks = PROJECTS.filter(p => TASKS.some(t => t.projectId === p.id));
+
+      return h("div", {className:"workload-container"},
+        h("div", {className:"dashboard-section"},
+          h("div", {className:"dashboard-section-title"}, "Workload Analysis"),
+          projectsWithTasks.length === 0
+            ? h("div", {style:{color:"#9ca3af",fontSize:13,padding:20,textAlign:"center"}}, "暂无任务数据")
+            : h("div", {style:{display:"flex",flexWrap:"wrap",gap:16}},
+                ...projectsWithTasks.map(p => h(ProjectHeatmap, {key:p.id, project:p}))
+              )
         )
       );
     }
@@ -2818,7 +2906,7 @@
           view==="gantt" && h(GanttView, {selectedProject}),
           view==="calendar" && h(CalendarView, {selectedProject}),
           view==="dashboard" && h(DashboardView, {selectedProject, setView, setSelectedProject}),
-          view==="workload" && h(WorkloadView, {selectedProject})
+          view==="workload" && h(WorkloadView, null)
         )
       );
     }
